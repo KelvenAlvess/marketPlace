@@ -1,4 +1,4 @@
-package com.example.marketPlace.Model;
+package com.example.marketPlace.model;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
