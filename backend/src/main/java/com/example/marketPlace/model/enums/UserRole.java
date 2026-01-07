@@ -1,4 +1,4 @@
-package com.example.marketPlace.Model.Enums;
+package com.example.marketPlace.model.enums;
 
 public enum UserRole {
     BUYER("Buyer"),

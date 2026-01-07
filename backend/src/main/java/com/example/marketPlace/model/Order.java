@@ -1,6 +1,6 @@
-package com.example.marketPlace.Model;
+package com.example.marketPlace.model;
 
-import com.example.marketPlace.Model.Enums.OrderStatus;
+import com.example.marketPlace.model.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
