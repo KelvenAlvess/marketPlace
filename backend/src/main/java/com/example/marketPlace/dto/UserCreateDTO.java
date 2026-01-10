@@ -1,9 +1,13 @@
 package com.example.marketPlace.dto;
 
+import com.example.marketPlace.model.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+
+import java.util.Set;
 
 public record UserCreateDTO(
         @NotBlank(message = "Nome é obrigatório")
@@ -28,5 +32,8 @@ public record UserCreateDTO(
 
         @NotBlank(message = "Endereço é obrigatório")
         @Size(max = 255, message = "Endereço deve ter no máximo 255 caracteres")
-        String address
+        String address,
+
+        @NotEmpty(message = "Pelo menos um papel deve ser atribuído")
+        Set<UserRole> roles
 ) {}

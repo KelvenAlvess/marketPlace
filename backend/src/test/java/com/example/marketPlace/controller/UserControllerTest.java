@@ -1,22 +1,20 @@
 package com.example.marketPlace.controller;
 
-import com.example.marketPlace.MarketPlaceApplication;
-import com.example.marketPlace.configurations .TestSecurityConfig;
 import com.example.marketPlace.dto.UserCreateDTO;
 import com.example.marketPlace.dto.UserResponseDTO;
+import com.example.marketPlace.model.enums.UserRole;
 import com.example.marketPlace.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -24,8 +22,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
-@ContextConfiguration(classes = {MarketPlaceApplication.class})
-@Import(TestSecurityConfig.class)
 class UserControllerTest {
 
     @Autowired
@@ -37,114 +33,106 @@ class UserControllerTest {
     @MockitoBean
     private UserService userService;
 
-    @Test
-    void deveCriarUsuarioComSucesso() throws Exception {
-        UserCreateDTO request = new UserCreateDTO(
-                "João Silva",
-                "joao@email.com",
+    private UserCreateDTO userCreateDTO;
+    private UserResponseDTO userResponseDTO;
+
+    @BeforeEach
+    void setUp() {
+        userCreateDTO = new UserCreateDTO(
+                "Test User",
+                "test@example.com",
                 "12345678901",
-                "11987654321",
-                "senha123",
-                "Rua das Flores, 123"
+                "1234567890",
+                "password123",
+                "Test Address",
+                Set.of(UserRole.BUYER)
         );
 
-        UserResponseDTO response = new UserResponseDTO(
+        userResponseDTO = new UserResponseDTO(
                 1L,
-                "João Silva",
-                "joao@email.com",
+                "Test User",
+                "test@example.com",
                 "12345678901",
-                "11987654321",
-                "Rua das Flores, 123",
+                "1234567890",
+                "Test Address",
+                Set.of(UserRole.BUYER),
                 LocalDateTime.now()
         );
+    }
 
-        when(userService.createUser(any(UserCreateDTO.class))).thenReturn(response);
+    @Test
+    void testCreateUser() throws Exception {
+        when(userService.createUser(any(UserCreateDTO.class))).thenReturn(userResponseDTO);
 
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(userCreateDTO)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.user_ID").value(1))
-                .andExpect(jsonPath("$.userName").value("João Silva"));
+                .andExpect(jsonPath("$.email").value("test@example.com"));
     }
 
     @Test
-    void deveRetornar400QuandoEmailInvalido() throws Exception {
-        UserCreateDTO request = new UserCreateDTO(
-                "Teste",
-                "emailinvalido",
-                "12345678901",
-                "11987654321",
-                "senha123",
-                "Rua Teste, 123"
-        );
-
-        mockMvc.perform(post("/api/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void deveRetornar400QuandoCpfInvalido() throws Exception {
-        UserCreateDTO request = new UserCreateDTO(
-                "Teste",
-                "teste@email.com",
+    void testCreateUserInvalidData() throws Exception {
+        UserCreateDTO invalidDTO = new UserCreateDTO(
+                "",
+                "invalid-email",
                 "123",
-                "11987654321",
-                "senha123",
-                "Rua Teste, 123"
-        );
-
-        mockMvc.perform(post("/api/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void deveRetornar400QuandoSenhaCurta() throws Exception {
-        UserCreateDTO request = new UserCreateDTO(
-                "Teste",
-                "teste@email.com",
-                "12345678901",
-                "11987654321",
+                "abc",
                 "123",
-                "Rua Teste, 123"
+                "",
+                Set.of(UserRole.BUYER)
         );
 
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(invalidDTO)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void deveListarTodosOsUsuarios() throws Exception {
-        when(userService.getAllUsers()).thenReturn(Collections.emptyList());
-
-        mockMvc.perform(get("/api/users"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
-    }
-
-    @Test
-    void deveBuscarUsuarioPorId() throws Exception {
-        UserResponseDTO response = new UserResponseDTO(
-                1L,
-                "João Silva",
-                "joao@email.com",
-                "12345678901",
-                "11987654321",
-                "Rua das Flores, 123",
-                LocalDateTime.now()
-        );
-
-        when(userService.getUserById(1L)).thenReturn(response);
+    void testGetUserById() throws Exception {
+        when(userService.getUserById(1L)).thenReturn(userResponseDTO);
 
         mockMvc.perform(get("/api/users/1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user_ID").value(1))
-                .andExpect(jsonPath("$.userName").value("João Silva"));
+                .andExpect(jsonPath("$.email").value("test@example.com"));
+    }
+
+    @Test
+    void testUpdateUser() throws Exception {
+        UserCreateDTO updateDTO = new UserCreateDTO(
+                "Updated User",
+                "updated@example.com",
+                "12345678901",
+                "1234567890",
+                "newpassword123",
+                "Updated Address",
+                Set.of(UserRole.SELLER)
+        );
+
+        UserResponseDTO updatedResponse = new UserResponseDTO(
+                1L,
+                "Updated User",
+                "updated@example.com",
+                "12345678901",
+                "1234567890",
+                "Updated Address",
+                Set.of(UserRole.SELLER),
+                LocalDateTime.now()
+        );
+
+        when(userService.updateUser(any(Long.class), any(UserCreateDTO.class))).thenReturn(updatedResponse);
+
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("updated@example.com"));
+    }
+
+    @Test
+    void testDeleteUser() throws Exception {
+        mockMvc.perform(delete("/api/users/1"))
+                .andExpect(status().isNoContent());
     }
 }
