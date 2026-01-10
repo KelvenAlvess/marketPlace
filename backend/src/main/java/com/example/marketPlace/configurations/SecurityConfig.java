@@ -18,12 +18,15 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/**",
                                 "/swagger-ui/**",
+                                "/swagger-ui.html",
                                 "/v3/api-docs/**",
-                                "/swagger-ui.html"
+                                "/swagger-resources/**",
+                                "/h2-console/**"
                         ).permitAll()
                         .anyRequest().permitAll()
                 )
-                .csrf(csrf -> csrf.disable());
+                .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.frameOptions(frame -> frame.disable()));
 
         return http.build();
     }

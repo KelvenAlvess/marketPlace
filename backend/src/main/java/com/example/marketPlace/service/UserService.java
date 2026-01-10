@@ -31,6 +31,10 @@ public class UserService {
             throw new UserAlreadyExistsException("Email já cadastrado: " + dto.email());
         }
 
+        if (userRepository.existsByCpf(dto.cpf())) {
+            throw new UserAlreadyExistsException("CPF já cadastrado: " + dto.cpf());
+        }
+
         User user = new User();
         user.setUserName(dto.userName());
         user.setEmail(dto.email());
@@ -38,10 +42,11 @@ public class UserService {
         user.setPhoneNumber(dto.phoneNumber());
         user.setPassword(bCryptPasswordEncoder.encode(dto.password()));
         user.setAddress(dto.address());
+        user.setRoles(dto.roles());
         user.setCreatedAt(LocalDateTime.now());
 
         User savedUser = userRepository.save(user);
-        log.info("Usuário criado com sucesso. ID: {}", savedUser.getUser_ID());
+        log.info("Usuário criado com sucesso. ID: {}, Roles: {}", savedUser.getUser_ID(), savedUser.getRoles());
 
         return UserResponseDTO.from(savedUser);
     }
@@ -92,18 +97,23 @@ public class UserService {
             throw new UserAlreadyExistsException("Email já cadastrado: " + dto.email());
         }
 
+        if (!user.getCpf().equals(dto.cpf()) && userRepository.existsByCpf(dto.cpf())) {
+            throw new UserAlreadyExistsException("CPF já cadastrado: " + dto.cpf());
+        }
+
         user.setUserName(dto.userName());
         user.setEmail(dto.email());
         user.setCpf(dto.cpf());
         user.setPhoneNumber(dto.phoneNumber());
         user.setAddress(dto.address());
+        user.setRoles(dto.roles());
 
         if (dto.password() != null && !dto.password().isEmpty()) {
             user.setPassword(bCryptPasswordEncoder.encode(dto.password()));
         }
 
         User updatedUser = userRepository.save(user);
-        log.info("Usuário atualizado com sucesso. ID: {}", updatedUser.getUser_ID());
+        log.info("Usuário atualizado com sucesso. ID: {}, Roles: {}", updatedUser.getUser_ID(), updatedUser.getRoles());
 
         return UserResponseDTO.from(updatedUser);
     }
