@@ -36,7 +36,7 @@ public class UserService {
         }
 
         User user = new User();
-        user.setUserName(dto.userName());
+        user.setUsername(dto.userName());
         user.setEmail(dto.email());
         user.setCpf(dto.cpf());
         user.setPhoneNumber(dto.phoneNumber());
@@ -46,7 +46,7 @@ public class UserService {
         user.setCreatedAt(LocalDateTime.now());
 
         User savedUser = userRepository.save(user);
-        log.info("Usuário criado com sucesso. ID: {}, Roles: {}", savedUser.getUser_ID(), savedUser.getRoles());
+        log.info("Usuário criado com sucesso. ID: {}, Roles: {}", savedUser.getUserId(), savedUser.getRoles());
 
         return UserResponseDTO.from(savedUser);
     }
@@ -101,7 +101,7 @@ public class UserService {
             throw new UserAlreadyExistsException("CPF já cadastrado: " + dto.cpf());
         }
 
-        user.setUserName(dto.userName());
+        user.setUsername(dto.userName());
         user.setEmail(dto.email());
         user.setCpf(dto.cpf());
         user.setPhoneNumber(dto.phoneNumber());
@@ -113,7 +113,7 @@ public class UserService {
         }
 
         User updatedUser = userRepository.save(user);
-        log.info("Usuário atualizado com sucesso. ID: {}, Roles: {}", updatedUser.getUser_ID(), updatedUser.getRoles());
+        log.info("Usuário atualizado com sucesso. ID: {}, Roles: {}", updatedUser.getUserId(), updatedUser.getRoles());
 
         return UserResponseDTO.from(updatedUser);
     }

@@ -40,15 +40,15 @@ public class AuthService {
 
             String token = jwtTokenUtil.generateToken(
                     user.getEmail(),
-                    user.getUser_ID(),
+                    user.getUserId(),
                     user.getRoles().stream().map(Enum::name).collect(Collectors.toSet())
             );
 
             log.info("Login realizado com sucesso para o usuário: {}", user.getEmail());
 
             return new LoginResponseDTO(
-                    user.getUser_ID(),
-                    user.getUserName(),
+                    user.getUserId(),
+                    user.getUsername(),
                     user.getEmail(),
                     user.getRoles(),
                     token
