@@ -20,10 +20,10 @@ import java.util.Set;
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long user_ID;
+    private Long userId;
 
     @Column(nullable = false, length = 100)
-    private String userName;
+    private String username;
 
     @Column(nullable = false, unique = true, length = 100)
     private String email;

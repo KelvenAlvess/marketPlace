@@ -33,7 +33,7 @@ public class CategoryService {
         category.setName(dto.name());
 
         Category savedCategory = categoryRepository.save(category);
-        log.info("Categoria criada com sucesso. ID: {}", savedCategory.getCategory_ID());
+        log.info("Categoria criada com sucesso. ID: {}", savedCategory.getCategoryId());
 
         return CategoryResponseDTO.from(savedCategory);
     }
@@ -87,7 +87,7 @@ public class CategoryService {
         category.setName(dto.name());
 
         Category updatedCategory = categoryRepository.save(category);
-        log.info("Categoria atualizada com sucesso. ID: {}", updatedCategory.getCategory_ID());
+        log.info("Categoria atualizada com sucesso. ID: {}", updatedCategory.getCategoryId());
 
         return CategoryResponseDTO.from(updatedCategory);
     }

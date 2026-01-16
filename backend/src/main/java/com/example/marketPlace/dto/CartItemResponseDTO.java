@@ -19,8 +19,8 @@ public record CartItemResponseDTO(
     public static CartItemResponseDTO from(CartItem cartItem) {
         return new CartItemResponseDTO(
                 cartItem.getId(),
-                cartItem.getUser().getUser_ID(),
-                cartItem.getProduct().getProduct_ID(),
+                cartItem.getUser().getUserId(),
+                cartItem.getProduct().getProductId(),
                 cartItem.getProduct().getProductName(),
                 cartItem.getQuantity(),
                 cartItem.getPrice(),
