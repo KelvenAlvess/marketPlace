@@ -21,7 +21,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
     List<OrderItem> findByProduct(Product product);
 
-    @Query("SELECT SUM(oi.priceAtTheTime * oi.quantity) FROM OrderItem oi WHERE oi.order = :order")
+    @Query("SELECT SUM(oi.unitPrice * oi.quantity) FROM OrderItem oi WHERE oi.order = :order")
     BigDecimal calculateOrderTotal(@Param("order") Order order);
 
     Long countByOrder(Order order);

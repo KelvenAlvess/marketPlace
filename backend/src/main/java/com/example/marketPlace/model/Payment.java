@@ -1,10 +1,13 @@
 package com.example.marketPlace.model;
 
+import com.example.marketPlace.model.enums.PaymentMethod;
+import com.example.marketPlace.model.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -37,14 +40,10 @@ public class Payment {
     private String transactionId;
 
     @OneToOne
+    @JoinColumn(name = "order_id")
+    private Order order;
+
+    @OneToOne
     @JoinColumn(name = "invoice_id")
     private Invoice invoice;
-
-    public enum PaymentMethod {
-        CREDIT_CARD, DEBIT_CARD, PIX, BANK_TRANSFER, CASH
-    }
-
-    public enum PaymentStatus {
-        PENDING, COMPLETED, FAILED, REFUNDED
-    }
 }

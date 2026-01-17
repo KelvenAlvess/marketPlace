@@ -31,6 +31,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/marketplace
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=admin123
+      - MERCADO_PAGO_ACCESS_TOKEN=TEST-0000000000000000-000000-00000000000000000000000000000000-00000000
     depends_on:
       postgres:
         condition: service_healthy

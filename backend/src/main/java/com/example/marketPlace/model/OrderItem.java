@@ -12,9 +12,8 @@ import java.math.BigDecimal;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-
 @Entity
-@Table(name = "orderItens")
+@Table(name = "order_items")
 public class OrderItem {
 
     @Id
@@ -30,8 +29,11 @@ public class OrderItem {
     private Product product;
 
     @Column(nullable = false)
-    private int quantity;
+    private Integer quantity;
 
-    @Column(nullable = false)
-    private BigDecimal priceAtTheTime;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal unitPrice;
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal subtotal;
 }
