@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import cartService from '../service/cartService';
 import { useAuth } from './AuthContext';
 
@@ -9,17 +10,7 @@ export function CartProvider({ children }) {
   const [cartCount, setCartCount] = useState(0);
   const { user } = useAuth();
 
-  // Carregar itens do carrinho quando usuário estiver logado
-  useEffect(() => {
-    if (user?.user_ID) {
-      loadCart();
-    } else {
-      setCartItems([]);
-      setCartCount(0);
-    }
-  }, [user]);
-
-  const loadCart = async () => {
+  const loadCart = useCallback(async () => {
     if (!user?.user_ID) return;
     
     try {
@@ -28,12 +19,26 @@ export function CartProvider({ children }) {
       setCartCount(items.reduce((total, item) => total + item.quantity, 0));
     } catch (error) {
       console.error('Erro ao carregar carrinho:', error);
+      // Não fazer nada em caso de erro para não quebrar a aplicação
     }
-  };
+  }, [user]);
+
+  // Carregar itens do carrinho quando usuário estiver logado
+  useEffect(() => {
+    if (user?.user_ID) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadCart();
+    } else {
+      setCartItems([]);
+      setCartCount(0);
+    }
+  }, [user, loadCart]);
 
   const addToCart = async (productId, quantity = 1) => {
     if (!user?.user_ID) {
-      alert('Faça login para adicionar produtos ao carrinho');
+      // Toast ou notificação mais elegante
+      const event = new CustomEvent('show-login-modal');
+      window.dispatchEvent(event);
       return false;
     }
 
@@ -44,9 +49,13 @@ export function CartProvider({ children }) {
         quantity: quantity
       });
       await loadCart(); // Recarregar carrinho
+      
+      // Feedback de sucesso
+      console.log('Produto adicionado ao carrinho com sucesso!');
       return true;
     } catch (error) {
       console.error('Erro ao adicionar ao carrinho:', error);
+      alert('Erro ao adicionar produto ao carrinho. Tente novamente.');
       return false;
     }
   };
@@ -63,7 +72,7 @@ export function CartProvider({ children }) {
 
   const updateQuantity = async (itemId, quantity) => {
     try {
-      await cartService.updateItemQuantity(itemId, quantity);
+      await cartService.updateQuantity(itemId, quantity);
       await loadCart();
     } catch (error) {
       console.error('Erro ao atualizar quantidade:', error);
@@ -71,21 +80,31 @@ export function CartProvider({ children }) {
     }
   };
 
-  const clearCart = () => {
-    setCartItems([]);
-    setCartCount(0);
+  const clearCart = async () => {
+    if (!user?.user_ID) return;
+    
+    try {
+      await cartService.clearCart(user.user_ID);
+      setCartItems([]);
+      setCartCount(0);
+    } catch (error) {
+      console.error('Erro ao limpar carrinho:', error);
+      throw error;
+    }
+  };
+
+  const value = {
+    cartItems,
+    cartCount,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    loadCart
   };
 
   return (
-    <CartContext.Provider value={{
-      cartItems,
-      cartCount,
-      addToCart,
-      removeFromCart,
-      updateQuantity,
-      clearCart,
-      loadCart
-    }}>
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );

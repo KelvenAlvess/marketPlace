@@ -3,12 +3,16 @@ import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import Login from './Login'
 import Cart from './Cart'
+import AddProduct from './AddProduct'
 
-function Navbar() {
+function Navbar({ onNavigate }) {
   const { cartCount } = useCart();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
   const [showCart, setShowCart] = useState(false);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+
+  const isSeller = user?.roles?.includes('SELLER');
 
   return (
     <>
@@ -19,13 +23,45 @@ function Navbar() {
           </div>
           
           <ul className="flex gap-8 list-none">
-            <li><a href="/" className="text-white font-normal hover:text-red-100 transition-colors duration-200">Home</a></li>
-            <li><a href="/products" className="text-white font-normal hover:text-red-100 transition-colors duration-200">Produtos</a></li>
-            <li><a href="/categories" className="text-white font-normal hover:text-red-100 transition-colors duration-200">Categorias</a></li>
-            <li><a href="/about" className="text-white font-normal hover:text-red-100 transition-colors duration-200">Sobre</a></li>
+            <li>
+              <button 
+                onClick={() => onNavigate?.('home')} 
+                className="text-white font-normal hover:text-red-100 transition-colors duration-200"
+              >
+                Home
+              </button>
+            </li>
+            <li>
+              <button 
+                onClick={() => onNavigate?.('products')} 
+                className="text-white font-normal hover:text-red-100 transition-colors duration-200"
+              >
+                Produtos
+              </button>
+            </li>
+            <li>
+              <button 
+                onClick={() => onNavigate?.('categories')} 
+                className="text-white font-normal hover:text-red-100 transition-colors duration-200"
+              >
+                Categorias
+              </button>
+            </li>
           </ul>
           
           <div className="flex gap-4 items-center">
+            {isSeller && (
+              <button 
+                onClick={() => setShowAddProduct(true)}
+                className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-md font-medium transition-all duration-200 flex items-center gap-2 shadow-sm"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Adicionar Produto
+              </button>
+            )}
+
             <button 
               onClick={() => setShowCart(true)}
               className="bg-white/90 hover:bg-white text-red-600 px-5 py-2.5 rounded-md font-medium transition-all duration-200 flex items-center gap-2 shadow-sm"
@@ -36,7 +72,7 @@ function Navbar() {
               Carrinho ({cartCount})
             </button>
             
-            {isAuthenticated() ? (
+            {user ? (
               <div className="flex items-center gap-3">
                 <span className="text-white text-sm">
                   Olá, {user.userName}
@@ -61,7 +97,13 @@ function Navbar() {
       </nav>
 
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
-      {showCart && <Cart isOpen={showCart} onClose={() => setShowCart(false)} />}
+      {showCart && <Cart isOpen={showCart} onClose={() => setShowCart(false)} onNavigate={onNavigate} />}
+      {showAddProduct && (
+        <AddProduct 
+          onClose={() => setShowAddProduct(false)} 
+          onProductAdded={() => window.location.reload()}
+        />
+      )}
     </>
   )
 }
