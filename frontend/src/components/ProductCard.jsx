@@ -1,40 +1,117 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useCart } from '../context/CartContext'
 
 function ProductCard({ product }) {
   const [adding, setAdding] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const { addToCart } = useCart();
+  const intervalRef = useRef(null);
+
+  // Parse images - suporta string separada por vírgula ou array
+  const images = (() => {
+    if (Array.isArray(product.imageUrl)) {
+      return product.imageUrl;
+    }
+    if (typeof product.imageUrl === 'string' && product.imageUrl.includes(',')) {
+      return product.imageUrl.split(',').map(url => url.trim());
+    }
+    return [product.imageUrl || product.image || 'https://via.placeholder.com/300x300?text=Produto'];
+  })();
+
+  // Carrossel automático no hover com transição mais suave
+  useEffect(() => {
+    if (isHovering && images.length > 1) {
+      intervalRef.current = setInterval(() => {
+        setImageLoaded(false); // Trigger fade effect
+        setCurrentImageIndex((prev) => (prev + 1) % images.length);
+      }, 2000); // Muda de imagem a cada 2 segundos para mais naturalidade
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      // Volta para primeira imagem suavemente quando sai do hover
+      if (!isHovering && currentImageIndex !== 0) {
+        setImageLoaded(false);
+        setTimeout(() => setCurrentImageIndex(0), 150);
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isHovering, images.length, currentImageIndex]);
 
   const handleAddToCart = async (event) => {
+    event.preventDefault();
     setAdding(true);
     
-    // Garante que o loading dura no máximo 1 segundo
-    const timeout = setTimeout(() => setAdding(false), 1000);
-    
-    const success = await addToCart(product.product_ID, 1);
-    
-    clearTimeout(timeout);
-    setAdding(false);
-    
-    if (success) {
-      // Feedback visual de sucesso
-      const button = event.currentTarget;
-      button.classList.add('animate-pulse');
-      setTimeout(() => button.classList.remove('animate-pulse'), 500);
+    try {
+      const success = await addToCart(product.product_ID, 1);
+      
+      if (success) {
+        // Feedback visual de sucesso
+        const button = event.currentTarget;
+        button.classList.add('bg-green-600');
+        
+        // Adicionar ícone de check temporariamente
+        setTimeout(() => {
+          button.classList.remove('bg-green-600');
+        }, 800);
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar ao carrinho:', error);
+    } finally {
+      setAdding(false);
     }
   };
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col border border-gray-200 group">
-      <div className="w-full h-64 overflow-hidden bg-gray-50 relative">
+      <div 
+        className="w-full h-64 overflow-hidden bg-gray-50 relative"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
         <img 
-          src={product.image || 'https://via.placeholder.com/300x300?text=Produto'} 
-          alt={product.productName}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          src={images[currentImageIndex]} 
+          alt={`${product.productName} - Imagem ${currentImageIndex + 1}`}
+          className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-700 ease-out ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          onLoad={() => setImageLoaded(true)}
+          style={{
+            transition: 'transform 0.7s ease-out, opacity 0.4s ease-in-out'
+          }}
         />
         {product.stockQuantity < 10 && (
-          <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded-md text-xs font-medium shadow-md">
+          <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded-md text-xs font-medium shadow-md z-10">
             Últimas unidades
+          </div>
+        )}
+        
+        {/* Indicadores de imagens com animação suave */}
+        {images.length > 1 && (
+          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2 z-10">
+            {images.map((_, index) => (
+              <button
+                key={index}
+                className={`h-2 rounded-full transition-all duration-500 ease-out ${
+                  index === currentImageIndex 
+                    ? 'bg-white w-8 shadow-lg' 
+                    : 'bg-white/60 w-2 hover:bg-white/90 hover:w-3'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImageLoaded(false);
+                  setCurrentImageIndex(index);
+                }}
+                aria-label={`Ver imagem ${index + 1}`}
+              />
+            ))}
           </div>
         )}
       </div>

@@ -1,39 +1,63 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import userService from '../service/userService';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState } from 'react';
+import axios from 'axios';
 
 const AuthContext = createContext();
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+// Criar instância axios sem interceptors para operações públicas
+const publicApi = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8081/api',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
 
-  useEffect(() => {
-    // Verificar se há usuário salvo no localStorage
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(() => {
+    // Inicializar estado a partir do localStorage
     const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    const savedToken = localStorage.getItem('token');
+    if (savedUser && savedToken) {
+      return JSON.parse(savedUser);
     }
-    setLoading(false);
-  }, []);
+    return null;
+  });
 
   const login = async (email, password) => {
     try {
-      // Buscar usuário por email
-      const userData = await userService.getUserByEmail(email);
+      // Fazer login usando axios direto (sem interceptors)
+      const response = await publicApi.post('/auth/login', { 
+        email, 
+        password 
+      });
       
-      // Por enquanto, aceita qualquer senha já que o backend não retorna a senha
-      // Em produção, você precisaria de um endpoint de login que valide a senha no backend
-      if (userData) {
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        return { success: true };
-      } else {
-        return { success: false, error: 'Usuário não encontrado' };
-      }
+      const data = response.data;
+      
+      console.log('📥 Resposta do login:', data);
+      console.log('🎫 Token recebido:', data.token ? 'Presente' : 'Ausente');
+      
+      // Salvar token e dados do usuário
+      localStorage.setItem('token', data.token);
+      const userData = {
+        user_ID: data.userId,
+        userName: data.userName,
+        email: data.email,
+        roles: data.roles
+      };
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+      
+      console.log('💾 Token salvo no localStorage');
+      console.log('👤 Dados do usuário salvos:', userData);
+      
+      return { success: true };
     } catch (error) {
       console.error('Erro ao fazer login:', error);
+      if (error.response?.status === 401) {
+        return { success: false, error: 'Email ou senha incorretos' };
+      }
       if (error.response?.status === 404) {
-        return { success: false, error: 'Email não encontrado' };
+        return { success: false, error: 'Usuário não encontrado' };
       }
       return { success: false, error: 'Erro ao fazer login. Tente novamente.' };
     }
@@ -41,50 +65,46 @@ export function AuthProvider({ children }) {
 
   const register = async (userData) => {
     try {
-      // Verificar se email já existe
-      const emailExists = await userService.existsByEmail(userData.email);
-      if (emailExists) {
-        return { success: false, error: 'Email já cadastrado' };
-      }
-
-      // Criar novo usuário
-      const newUser = await userService.createUser({
+      // Criar usuário usando axios direto (sem token - endpoint público)
+      await publicApi.post('/users', {
         userName: userData.name,
         email: userData.email,
         password: userData.password,
         cpf: userData.cpf,
         phoneNumber: userData.phone,
         address: userData.address,
-        roles: ["BUYER"] // Usuário padrão como comprador
+        roles: userData.roles || ["BUYER"]
       });
 
-      setUser(newUser);
-      localStorage.setItem('user', JSON.stringify(newUser));
-      return { success: true };
+      // Após criar usuário, fazer login automaticamente
+      return await login(userData.email, userData.password);
     } catch (error) {
       console.error('Erro ao registrar:', error);
-      return { success: false, error: 'Erro ao criar conta. Verifique os dados.' };
+      if (error.response?.data?.message) {
+        return { success: false, error: error.response.data.message };
+      }
+      if (error.response?.status === 400) {
+        return { success: false, error: 'Dados inválidos. Verifique as informações.' };
+      }
+      return { success: false, error: 'Erro ao criar conta. Tente novamente.' };
     }
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
   };
 
-  const isAuthenticated = () => {
-    return user !== null;
+  const value = {
+    user,
+    login,
+    logout,
+    register
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      login,
-      register,
-      logout,
-      isAuthenticated
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
