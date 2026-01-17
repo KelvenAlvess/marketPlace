@@ -220,7 +220,7 @@ public class OrderService {
                 .map(order -> {
                     List<OrderItem> items = orderItemRepository.findByOrder(order);
                     BigDecimal total = items.stream()
-                            .map(item -> item.getPriceAtTheTime()
+                            .map(item -> item.getUnitPrice()
                                     .multiply(BigDecimal.valueOf(item.getQuantity())))
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -265,7 +265,7 @@ public class OrderService {
                     orderItem.setOrder(order);
                     orderItem.setProduct(product);
                     orderItem.setQuantity(cartItem.getQuantity());
-                    orderItem.setPriceAtTheTime(product.getProductPrice());
+                    orderItem.setUnitPrice(product.getProductPrice());
 
                     log.debug("Item criado: {} x {} - R$ {}",
                             product.getProductName(),

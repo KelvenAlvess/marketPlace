@@ -13,7 +13,7 @@ public record OrderItemResponseDTO(
         BigDecimal subtotal
 ) {
     public static OrderItemResponseDTO from(OrderItem orderItem) {
-        BigDecimal subtotal = orderItem.getPriceAtTheTime()
+        BigDecimal subtotal = orderItem.getUnitPrice()
                 .multiply(BigDecimal.valueOf(orderItem.getQuantity()));
 
         return new OrderItemResponseDTO(
@@ -21,7 +21,7 @@ public record OrderItemResponseDTO(
                 orderItem.getProduct().getProductId(),
                 orderItem.getProduct().getProductName(),
                 orderItem.getQuantity(),
-                orderItem.getPriceAtTheTime(),
+                orderItem.getUnitPrice(),
                 subtotal
         );
     }

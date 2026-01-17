@@ -68,6 +68,9 @@ public class SecurityConfig {
                         // Pedidos
                         .requestMatchers("/api/orders/**").hasAnyRole("BUYER", "SELLER")
 
+                        // Pagamentos - somente compradores autenticados
+                        .requestMatchers("/api/payments/**").hasRole("BUYER")
+
                         // Usuários (outras operações)
                         .requestMatchers("/api/users/**").authenticated()
 
@@ -79,5 +82,4 @@ public class SecurityConfig {
 
         return http.build();
     }
-
 }
