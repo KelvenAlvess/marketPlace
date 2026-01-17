@@ -18,6 +18,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/cart-items")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 @RequiredArgsConstructor
 @Tag(name = "Cart Item Controller", description = "APIs para gerenciamento dos itens do carrinho de compras")
 public class CartItemController {

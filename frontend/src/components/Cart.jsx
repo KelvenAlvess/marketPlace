@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
-function Cart({ isOpen, onClose }) {
+function Cart({ isOpen, onClose, onNavigate }) {
   const { cartItems, removeFromCart, updateQuantity, cartCount } = useCart();
   const { user } = useAuth();
   const [removingItems, setRemovingItems] = useState(new Set());
@@ -171,7 +171,13 @@ function Cart({ isOpen, onClose }) {
                 R$ {calculateTotal().toFixed(2)}
               </span>
             </div>
-            <button className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-md">
+            <button 
+              onClick={() => {
+                onClose();
+                onNavigate('checkout');
+              }}
+              className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-md"
+            >
               Finalizar Pedido
             </button>
             <button
