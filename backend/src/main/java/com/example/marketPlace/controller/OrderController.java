@@ -94,25 +94,6 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
-    @Operation(
-            summary = "Listar resumo dos pedidos do usuário",
-            description = "Retorna um resumo simplificado dos pedidos do usuário (sem detalhes dos itens)."
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Resumo retornado com sucesso"),
-            @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
-                    content = @Content)
-    })
-    @GetMapping("/user/{userId}/summary")
-    public ResponseEntity<List<OrderSummaryDTO>> getUserOrdersSummary(
-            @Parameter(description = "ID do usuário", required = true)
-            @PathVariable Long userId) {
-        log.info("GET /api/orders/user/{}/summary - Buscando resumo dos pedidos", userId);
-
-        List<OrderSummaryDTO> summary = orderService.getUserOrdersSummary(userId);
-
-        return ResponseEntity.ok(summary);
-    }
 
     @Operation(
             summary = "Listar todos os pedidos",

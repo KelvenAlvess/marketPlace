@@ -1,115 +1,139 @@
-/* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState } from 'react';
-import axios from 'axios';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import userService from '../service/userService';
+import api from '../service/api';
 
 const AuthContext = createContext();
 
-// Criar instância axios sem interceptors para operações públicas
-const publicApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8081/api',
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
 export function AuthProvider({ children }) {
+  // 1. Inicialização do Estado
   const [user, setUser] = useState(() => {
-    // Inicializar estado a partir do localStorage
     const savedUser = localStorage.getItem('user');
-    const savedToken = localStorage.getItem('token');
-    if (savedUser && savedToken) {
+    if (!savedUser || savedUser === 'undefined') return null;
+    try {
       return JSON.parse(savedUser);
+    } catch (error) {
+      localStorage.removeItem('user');
+      return null;
     }
-    return null;
   });
+
+  const [loading, setLoading] = useState(false);
+
+  // 2. Função de Logout (precisa ser useCallback para usar no interceptor)
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    delete api.defaults.headers.common['Authorization'];
+    // Opcional: Redirecionar para login
+    window.location.href = '/login';
+  }, []);
+
+  // 3. Configuração Inicial e Interceptor de Expiração
+  useEffect(() => {
+    const savedToken = localStorage.getItem('token');
+
+    if (savedToken) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+    }
+
+    // INTERCEPTOR: Se o backend devolver 401/403 (Token inválido/expirado), desloga.
+    const interceptorId = api.interceptors.response.use(
+        response => response,
+        error => {
+          if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+            console.warn("Sessão expirada. Deslogando...");
+            logout();
+          }
+          return Promise.reject(error);
+        }
+    );
+
+    // Remove o interceptor quando o componente desmontar
+    return () => {
+      api.interceptors.response.eject(interceptorId);
+    };
+  }, [logout]);
 
   const login = async (email, password) => {
     try {
-      // Fazer login usando axios direto (sem interceptors)
-      const response = await publicApi.post('/auth/login', { 
-        email, 
-        password 
-      });
-      
-      const data = response.data;
-      
-      console.log('📥 Resposta do login:', data);
-      console.log('🎫 Token recebido:', data.token ? 'Presente' : 'Ausente');
-      
-      // Salvar token e dados do usuário
-      localStorage.setItem('token', data.token);
-      const userData = {
-        user_ID: data.userId,
-        userName: data.userName,
-        email: data.email,
-        roles: data.roles
-      };
+      setLoading(true);
+      const response = await userService.login(email, password);
+
+      const { token, ...userData } = response;
+
+      localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(userData);
-      
-      console.log('💾 Token salvo no localStorage');
-      console.log('👤 Dados do usuário salvos:', userData);
-      
+
       return { success: true };
     } catch (error) {
-      console.error('Erro ao fazer login:', error);
-      if (error.response?.status === 401) {
-        return { success: false, error: 'Email ou senha incorretos' };
-      }
-      if (error.response?.status === 404) {
-        return { success: false, error: 'Usuário não encontrado' };
-      }
-      return { success: false, error: 'Erro ao fazer login. Tente novamente.' };
+      console.error('Erro no login:', error);
+      return { success: false, error: 'Email ou senha inválidos' };
+    } finally {
+      setLoading(false);
     }
   };
 
   const register = async (userData) => {
     try {
-      // Criar usuário usando axios direto (sem token - endpoint público)
-      await publicApi.post('/users', {
+      setLoading(true);
+      const roles = userData.role === 'SELLER' ? ['SELLER', 'BUYER'] : ['BUYER'];
+
+      const newUserConfig = {
         userName: userData.name,
         email: userData.email,
         password: userData.password,
         cpf: userData.cpf,
         phoneNumber: userData.phone,
         address: userData.address,
-        roles: userData.roles || ["BUYER"]
-      });
+        roles: roles
+      };
 
-      // Após criar usuário, fazer login automaticamente
-      return await login(userData.email, userData.password);
+      await userService.createUser(newUserConfig);
+      return { success: true };
     } catch (error) {
       console.error('Erro ao registrar:', error);
-      if (error.response?.data?.message) {
-        return { success: false, error: error.response.data.message };
-      }
-      if (error.response?.status === 400) {
-        return { success: false, error: 'Dados inválidos. Verifique as informações.' };
-      }
-      return { success: false, error: 'Erro ao criar conta. Tente novamente.' };
+      const msg = error.response?.data?.message || 'Erro ao criar conta.';
+      return { success: false, error: msg };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+  // 4. NOVA FUNÇÃO: Atualiza dados do usuário localmente
+  // Útil quando o Checkout atualiza o endereço/telefone
+  const updateUserLocal = (updatedData) => {
+    setUser(prevUser => {
+      const newUser = { ...prevUser, ...updatedData };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
+    });
   };
 
-  const value = {
-    user,
-    login,
-    logout,
-    register
-  };
+  // 5. Helpers de Verificação
+  const isAuthenticated = () => !!user && !!localStorage.getItem('token');
+
+  const hasRole = (role) => user?.roles?.includes(role);
 
   return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+      <AuthContext.Provider value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        updateUserLocal, // Exposta para usar no Checkout
+        isAuthenticated,
+        hasRole
+      }}>
+        {children}
+      </AuthContext.Provider>
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

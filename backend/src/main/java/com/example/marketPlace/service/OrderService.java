@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,284 +31,209 @@ public class OrderService {
     public OrderResponseDTO createOrderFromCart(OrderCreateDTO dto) {
         log.info("Criando pedido para o usuário ID: {}", dto.userId());
 
+        // 1. Buscar Usuário
         User buyer = userRepository.findById(dto.userId())
                 .orElseThrow(() -> new UserNotFoundException(dto.userId()));
 
+        // 2. Buscar Itens do Carrinho
         List<CartItem> cartItems = cartItemRepository.findByUser(buyer);
 
         if (cartItems.isEmpty()) {
             throw new EmptyCartException(dto.userId());
         }
 
+        // 3. Validar Estoque (Lança exceção se falhar)
         validateStock(cartItems);
 
+        // 4. Criar o Pedido (Cabeçalho)
         Order order = new Order();
         order.setBuyer(buyer);
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(OrderStatus.PENDING);
 
+        // 5. Converter CartItems em OrderItems e Calcular Totais
+        List<OrderItem> orderItems = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (CartItem cartItem : cartItems) {
+            OrderItem orderItem = new OrderItem();
+            orderItem.setOrder(order); // Vínculo Bidirecional Importante
+            orderItem.setProduct(cartItem.getProduct());
+            orderItem.setQuantity(cartItem.getQuantity());
+
+            // Conversão segura de Double (Cart) para BigDecimal (Order)
+            BigDecimal unitPrice = BigDecimal.valueOf(cartItem.getPrice());
+            orderItem.setUnitPrice(unitPrice);
+
+            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+            orderItem.setSubtotal(subtotal);
+
+            orderItems.add(orderItem);
+            totalAmount = totalAmount.add(subtotal);
+
+            // Baixa no Estoque
+            Product product = cartItem.getProduct();
+            product.setStockQuantity(product.getStockQuantity() - cartItem.getQuantity());
+            productRepository.save(product);
+        }
+
+        order.setItems(orderItems);
+        order.setTotal(totalAmount);
+
+        // 6. Salvar Pedido (Cascade salvará os itens)
         Order savedOrder = orderRepository.save(order);
-        log.info("Pedido criado com ID: {}", savedOrder.getOrderId());
+        log.info("Pedido criado com sucesso: ID {}", savedOrder.getOrderId());
 
-        List<OrderItem> orderItems = createOrderItemsFromCart(savedOrder, cartItems);
-        orderItemRepository.saveAll(orderItems);
-
+        // 7. Limpar Carrinho
         cartItemRepository.deleteAll(cartItems);
-        log.info("Carrinho limpo para o usuário ID: {}", dto.userId());
 
-        List<OrderItemResponseDTO> itemsDTO = orderItems.stream()
+        // 8. Retornar DTO
+        // Precisamos converter os OrderItems salvos para DTOs para a resposta
+        List<OrderItemResponseDTO> itemDTOs = savedOrder.getItems().stream()
                 .map(OrderItemResponseDTO::from)
                 .collect(Collectors.toList());
 
-        return OrderResponseDTO.from(savedOrder, itemsDTO);
+        return OrderResponseDTO.from(savedOrder, itemDTOs);
+    }
+
+    private void validateStock(List<CartItem> cartItems) {
+        for (CartItem item : cartItems) {
+            Product product = item.getProduct();
+            if (product.getStockQuantity() < item.getQuantity()) {
+                throw new InsufficientStockException(
+                        product.getProductName(),
+                        product.getStockQuantity(),
+                        item.getQuantity()
+                );
+            }
+        }
     }
 
     @Transactional(readOnly = true)
     public OrderResponseDTO getOrderById(Long orderId) {
-        log.info("Buscando pedido ID: {}", orderId);
-
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
-        List<OrderItemResponseDTO> items = orderItemRepository.findByOrder(order)
-                .stream()
+        List<OrderItemResponseDTO> itemDTOs = order.getItems().stream()
                 .map(OrderItemResponseDTO::from)
                 .collect(Collectors.toList());
 
-        return OrderResponseDTO.from(order, items);
+        return OrderResponseDTO.from(order, itemDTOs);
     }
 
     @Transactional(readOnly = true)
     public List<OrderResponseDTO> getUserOrders(Long userId) {
-        log.info("Buscando pedidos do usuário ID: {}", userId);
-
         User buyer = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        List<Order> orders = orderRepository.findByBuyerOrderByOrderDateDesc(buyer);
-
-        return orders.stream()
+        return orderRepository.findByBuyerOrderByOrderDateDesc(buyer).stream()
                 .map(order -> {
-                    List<OrderItemResponseDTO> items = orderItemRepository.findByOrder(order)
-                            .stream()
+                    List<OrderItemResponseDTO> itemDTOs = order.getItems().stream()
                             .map(OrderItemResponseDTO::from)
                             .collect(Collectors.toList());
-                    return OrderResponseDTO.from(order, items);
+                    return OrderResponseDTO.from(order, itemDTOs);
                 })
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<OrderResponseDTO> getAllOrders() {
-        log.info("Buscando todos os pedidos");
-
-        List<Order> orders = orderRepository.findAll();
-
-        return orders.stream()
+        return orderRepository.findAll().stream()
                 .map(order -> {
-                    List<OrderItemResponseDTO> items = orderItemRepository.findByOrder(order)
-                            .stream()
+                    List<OrderItemResponseDTO> itemDTOs = order.getItems().stream()
                             .map(OrderItemResponseDTO::from)
                             .collect(Collectors.toList());
-                    return OrderResponseDTO.from(order, items);
+                    return OrderResponseDTO.from(order, itemDTOs);
                 })
                 .collect(Collectors.toList());
     }
-
-    @Transactional(readOnly = true)
-    public List<OrderResponseDTO> getOrdersByStatus(OrderStatus status) {
-        log.info("Buscando pedidos com status: {}", status);
-
-        List<Order> orders = orderRepository.findByStatusOrderByOrderDateDesc(status);
-
-        return orders.stream()
-                .map(order -> {
-                    List<OrderItemResponseDTO> items = orderItemRepository.findByOrder(order)
-                            .stream()
-                            .map(OrderItemResponseDTO::from)
-                            .collect(Collectors.toList());
-                    return OrderResponseDTO.from(order, items);
-                })
-                .collect(Collectors.toList());
-    }
-
 
     @Transactional
     public OrderResponseDTO updateOrderStatus(Long orderId, OrderStatusUpdateDTO dto) {
-        log.info("Atualizando status do pedido ID: {} para {}", orderId, dto.status());
-
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
         validateStatusTransition(order.getStatus(), dto.status());
 
-        if (dto.status() == OrderStatus.CANCELED) {
-            returnStockFromOrder(order);
-        }
-
         order.setStatus(dto.status());
         Order updatedOrder = orderRepository.save(order);
 
-        log.info("Status do pedido ID: {} atualizado para {}", orderId, dto.status());
-
-        List<OrderItemResponseDTO> items = orderItemRepository.findByOrder(updatedOrder)
-                .stream()
+        List<OrderItemResponseDTO> itemDTOs = updatedOrder.getItems().stream()
                 .map(OrderItemResponseDTO::from)
                 .collect(Collectors.toList());
 
-        return OrderResponseDTO.from(updatedOrder, items);
+        return OrderResponseDTO.from(updatedOrder, itemDTOs);
     }
 
     @Transactional
     public OrderResponseDTO cancelOrder(Long orderId, Long userId) {
-        log.info("Cancelando pedido ID: {} pelo usuário ID: {}", orderId, userId);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
 
-        User buyer = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId));
+        // Verifica se o usuário é dono do pedido ou ADMIN (simplificado aqui só checando ID)
+        if (!order.getBuyer().getUserId().equals(userId)) {
 
-        Order order = orderRepository.findByOrderIdAndBuyer(orderId, buyer)
-                .orElseThrow(() -> new OrderNotFoundException("Pedido não encontrado ou não pertence ao usuário"));
-
-        if (order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.CANCELED) {
-            throw new InvalidOrderStatusException(
-                    "Não é possível cancelar um pedido com status: " + order.getStatus());
+            throw new RuntimeException("Usuário não tem permissão para cancelar este pedido");
         }
 
-        returnStockFromOrder(order);
+        if (order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.SHIPPED) {
+            throw new InvalidOrderStatusException("Não é possível cancelar pedido já enviado ou entregue");
+        }
 
         order.setStatus(OrderStatus.CANCELED);
         Order canceledOrder = orderRepository.save(order);
 
-        log.info("Pedido ID: {} cancelado com sucesso", orderId);
+        // Devolve o estoque
+        returnStockFromOrder(canceledOrder);
 
-        List<OrderItemResponseDTO> items = orderItemRepository.findByOrder(canceledOrder)
-                .stream()
+        List<OrderItemResponseDTO> itemDTOs = canceledOrder.getItems().stream()
                 .map(OrderItemResponseDTO::from)
                 .collect(Collectors.toList());
 
-        return OrderResponseDTO.from(canceledOrder, items);
+        return OrderResponseDTO.from(canceledOrder, itemDTOs);
     }
 
     @Transactional
     public void deleteOrder(Long orderId) {
-        log.info("Deletando pedido ID: {}", orderId);
-
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
         if (order.getStatus() != OrderStatus.CANCELED) {
-            throw new InvalidOrderStatusException(
-                    "Apenas pedidos cancelados podem ser deletados. Status atual: " + order.getStatus());
+            throw new RuntimeException("Apenas pedidos cancelados podem ser deletados");
         }
 
-        orderItemRepository.deleteByOrder(order);
         orderRepository.delete(order);
-
-        log.info("Pedido ID: {} deletado com sucesso", orderId);
-    }
-
-
-    @Transactional(readOnly = true)
-    public List<OrderSummaryDTO> getUserOrdersSummary(Long userId) {
-        log.info("Buscando resumo dos pedidos do usuário ID: {}", userId);
-
-        User buyer = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId));
-
-        List<Order> orders = orderRepository.findByBuyerOrderByOrderDateDesc(buyer);
-
-        return orders.stream()
-                .map(order -> {
-                    List<OrderItem> items = orderItemRepository.findByOrder(order);
-                    BigDecimal total = items.stream()
-                            .map(item -> item.getUnitPrice()
-                                    .multiply(BigDecimal.valueOf(item.getQuantity())))
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-                    Integer totalItems = items.stream()
-                            .map(OrderItem::getQuantity)
-                            .reduce(0, Integer::sum);
-
-                    return new OrderSummaryDTO(
-                            order.getOrderId(),
-                            order.getOrderDate(),
-                            order.getStatus().name(),
-                            totalItems,
-                            total
-                    );
-                })
-                .collect(Collectors.toList());
-    }
-
-    private void validateStock(List<CartItem> cartItems) {
-        for (CartItem cartItem : cartItems) {
-            Product product = cartItem.getProduct();
-            if (product.getStockQuantity() < cartItem.getQuantity()) {
-                throw new InsufficientStockException(
-                        product.getProductName(),
-                        product.getStockQuantity(),
-                        cartItem.getQuantity()
-                );
-            }
-        }
-    }
-
-
-    private List<OrderItem> createOrderItemsFromCart(Order order, List<CartItem> cartItems) {
-        return cartItems.stream()
-                .map(cartItem -> {
-                    Product product = cartItem.getProduct();
-
-                    product.setStockQuantity(product.getStockQuantity() - cartItem.getQuantity());
-                    productRepository.save(product);
-
-                    OrderItem orderItem = new OrderItem();
-                    orderItem.setOrder(order);
-                    orderItem.setProduct(product);
-                    orderItem.setQuantity(cartItem.getQuantity());
-                    orderItem.setUnitPrice(product.getProductPrice());
-
-                    log.debug("Item criado: {} x {} - R$ {}",
-                            product.getProductName(),
-                            cartItem.getQuantity(),
-                            product.getProductPrice());
-
-                    return orderItem;
-                })
-                .collect(Collectors.toList());
     }
 
     private void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
-
         if (currentStatus == OrderStatus.DELIVERED || currentStatus == OrderStatus.CANCELED) {
             throw new InvalidOrderStatusException(
                     "Não é possível alterar status de um pedido " + currentStatus);
         }
-
-        if (currentStatus == OrderStatus.PENDING && newStatus == OrderStatus.DELIVERED) {
-            throw new InvalidOrderStatusException(currentStatus.name(), newStatus.name());
-        }
-
-        if (currentStatus == OrderStatus.SHIPPED && newStatus == OrderStatus.PROCESSING) {
-            throw new InvalidOrderStatusException(currentStatus.name(), newStatus.name());
-        }
     }
 
     private void returnStockFromOrder(Order order) {
-        List<OrderItem> orderItems = orderItemRepository.findByOrder(order);
-
-        for (OrderItem orderItem : orderItems) {
+        for (OrderItem orderItem : order.getItems()) {
             Product product = orderItem.getProduct();
             product.setStockQuantity(product.getStockQuantity() + orderItem.getQuantity());
             productRepository.save(product);
 
-            log.debug("Estoque devolvido: {} +{} unidades",
+            log.info("Estoque devolvido: {} +{} unidades",
                     product.getProductName(),
                     orderItem.getQuantity());
         }
-
-        log.info("Estoque devolvido para {} produtos do pedido ID: {}",
-                orderItems.size(), order.getOrderId());
+    }
+    @Transactional(readOnly = true)
+    public List<OrderResponseDTO> getOrdersByStatus(OrderStatus status) {
+        return orderRepository.findByStatusOrderByOrderDateDesc(status).stream()
+                .map(order -> {
+                    // Mapeia os itens do pedido
+                    List<OrderItemResponseDTO> itemDTOs = order.getItems().stream()
+                            .map(OrderItemResponseDTO::from)
+                            .collect(Collectors.toList());
+                    // Retorna o DTO completo
+                    return OrderResponseDTO.from(order, itemDTOs);
+                })
+                .collect(Collectors.toList());
     }
 }
-

@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import cartService from '../service/cartService';
 import { useAuth } from './AuthContext';
@@ -10,48 +9,56 @@ export function CartProvider({ children }) {
   const [cartCount, setCartCount] = useState(0);
   const { user } = useAuth();
 
+  // CORREÇÃO 1: loadCart agora é PURAMENTE para buscar dados.
+  // Removemos a lógica de "else { setCartItems([]) }" daqui de dentro.
+  // Se não tem user, ela retorna void sem disparar nenhum setState.
   const loadCart = useCallback(async () => {
-    if (!user?.user_ID) return;
+    const userId = user?.id || user?.user_ID || user?.userId;
+    
+    // Se não tem usuário, PARE. Não limpe o estado aqui.
+    if (!userId) return;
     
     try {
-      const items = await cartService.getCartItems(user.user_ID);
+      const items = await cartService.getCartItems(userId);
       setCartItems(items);
-      setCartCount(items.reduce((total, item) => total + item.quantity, 0));
+      setCartCount(items.reduce((total, item) => total + (Number(item.quantity) || 0), 0));
     } catch (error) {
       console.error('Erro ao carregar carrinho:', error);
       // Não fazer nada em caso de erro para não quebrar a aplicação
     }
   }, [user]);
 
-  // Carregar itens do carrinho quando usuário estiver logado
+  // CORREÇÃO 2: O useEffect gerencia o ciclo de vida (Login vs Logout)
   useEffect(() => {
-    if (user?.user_ID) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    const userId = user?.id || user?.user_ID || user?.userId;
+
+    if (userId) {
+      // Se tem usuário, chama a função Async (permitido)
       loadCart();
     } else {
-      setCartItems([]);
-      setCartCount(0);
+      // Se NÃO tem usuário (Logout ou Load inicial), limpamos o estado AQUI.
+      // Usamos a checagem 'prev.length > 0' para garantir que o React
+      // ignore essa atualização se o carrinho já estiver vazio.
+      setCartItems(prev => (prev.length > 0 ? [] : prev));
+      setCartCount(prev => (prev > 0 ? 0 : prev));
     }
   }, [user, loadCart]);
 
   const addToCart = async (productId, quantity = 1) => {
-    if (!user?.user_ID) {
-      // Toast ou notificação mais elegante
-      const event = new CustomEvent('show-login-modal');
-      window.dispatchEvent(event);
+    const userId = user?.id || user?.user_ID || user?.userId;
+
+    if (!userId) {
+      alert('Faça login para adicionar produtos ao carrinho');
       return false;
     }
 
     try {
       await cartService.addItem({
-        userId: user.user_ID,
+        userId: userId,
         productId: productId,
         quantity: quantity
       });
-      await loadCart(); // Recarregar carrinho
-      
-      // Feedback de sucesso
-      console.log('Produto adicionado ao carrinho com sucesso!');
+      await loadCart();
       return true;
     } catch (error) {
       console.error('Erro ao adicionar ao carrinho:', error);
@@ -110,6 +117,7 @@ export function CartProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCart() {
   const context = useContext(CartContext);
   if (!context) {

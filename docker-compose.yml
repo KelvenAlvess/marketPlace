@@ -32,9 +32,15 @@ services:
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=admin123
       - MERCADO_PAGO_ACCESS_TOKEN=TEST-0000000000000000-000000-00000000000000000000000000000000-00000000
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=user
+      - RABBITMQ_PASSWORD=password
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - marketplace-network
 
@@ -49,6 +55,18 @@ services:
       - VITE_API_URL=http://localhost:8081/api
     depends_on:
       - backend
+    networks:
+      - marketplace-network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: marketplace-rabbitmq
+    ports:
+      - "5672:5672"   # Porta padrão de comunicação
+      - "15672:15672" # Painel de administração (Web UI)
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
     networks:
       - marketplace-network
 volumes:

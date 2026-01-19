@@ -7,17 +7,12 @@ const api = axios.create({
     }
 });
 
-// Interceptor para adicionar o token em todas as requisições
+// Interceptor para adicionar token JWT em todas as requisições
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
-        console.log('🔑 Token no localStorage:', token ? 'Presente' : 'Ausente');
-        console.log('📤 Enviando requisição para:', config.url);
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
-            console.log('✅ Header Authorization adicionado');
-        } else {
-            console.warn('⚠️ Token não encontrado - requisição sem autenticação');
         }
         return config;
     },
@@ -26,7 +21,7 @@ api.interceptors.request.use(
     }
 );
 
-// Interceptor para tratar erros de autenticação
+// Interceptor para tratar erros de resposta
 api.interceptors.response.use(
     (response) => response,
     (error) => {

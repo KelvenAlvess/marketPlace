@@ -6,12 +6,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public record CategoryResponseDTO(
         @JsonProperty("category_ID")
         Long categoryId,
-        String name
+        String name,
+        String description
 ) {
     public static CategoryResponseDTO from(Category category) {
         return new CategoryResponseDTO(
                 category.getCategoryId(),
-                category.getName()
+                category.getName(),
+                category.getDescription()
         );
     }
 }

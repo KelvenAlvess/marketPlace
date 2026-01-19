@@ -41,6 +41,9 @@ public class Product {
     @Column(nullable = false)
     private Integer stockQuantity;
 
-    @Column(length = 1000)
-    private String imageUrl;
+    @Column(length = 500)
+    private String image;
+
+    public void setSelelr(User admin) {
+    }
 }
