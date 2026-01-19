@@ -14,7 +14,8 @@ public record ProductCreateDTO(
         @NotNull Long categoryId,        // ← apenas ID
         @NotNull BigDecimal price,
         @NotNull Long sellerId,          // ← apenas ID
-        @NotNull Integer stockQuantity
+        @NotNull Integer stockQuantity,
+        String imageUrl
 ) {
     public Product toEntity(Category category, User seller) {
         Product product = new Product();
@@ -24,6 +25,7 @@ public record ProductCreateDTO(
         product.setProductPrice(this.price);
         product.setSeller(seller);
         product.setStockQuantity(this.stockQuantity);
+        product.setImageUrl(this.imageUrl);
         return product;
     }
 }

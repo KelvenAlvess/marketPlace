@@ -81,6 +81,45 @@ function Login() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipo de Conta
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={registerData.roles.includes('BUYER')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setRegisterData({ ...registerData, roles: [...registerData.roles, 'BUYER'] });
+                        } else {
+                          setRegisterData({ ...registerData, roles: registerData.roles.filter(r => r !== 'BUYER') });
+                        }
+                      }}
+                      className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Comprador - Comprar produtos</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={registerData.roles.includes('SELLER')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setRegisterData({ ...registerData, roles: [...registerData.roles, 'SELLER'] });
+                        } else {
+                          setRegisterData({ ...registerData, roles: registerData.roles.filter(r => r !== 'SELLER') });
+                        }
+                      }}
+                      className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Vendedor - Vender produtos</span>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">Selecione pelo menos uma opção</p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Senha
                 </label>

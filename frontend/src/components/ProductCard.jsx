@@ -3,7 +3,47 @@ import { useCart } from '../context/CartContext';
 
 function ProductCard({ product }) {
   const [adding, setAdding] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const { addToCart } = useCart();
+  const intervalRef = useRef(null);
+
+  // Parse images - suporta string separada por vírgula ou array
+  const images = (() => {
+    if (Array.isArray(product.imageUrl)) {
+      return product.imageUrl;
+    }
+    if (typeof product.imageUrl === 'string' && product.imageUrl.includes(',')) {
+      return product.imageUrl.split(',').map(url => url.trim());
+    }
+    return [product.imageUrl || product.image || 'https://via.placeholder.com/300x300?text=Produto'];
+  })();
+
+  // Carrossel automático no hover com transição mais suave
+  useEffect(() => {
+    if (isHovering && images.length > 1) {
+      intervalRef.current = setInterval(() => {
+        setImageLoaded(false); // Trigger fade effect
+        setCurrentImageIndex((prev) => (prev + 1) % images.length);
+      }, 2000); // Muda de imagem a cada 2 segundos para mais naturalidade
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      // Volta para primeira imagem suavemente quando sai do hover
+      if (!isHovering && currentImageIndex !== 0) {
+        setImageLoaded(false);
+        setTimeout(() => setCurrentImageIndex(0), 150);
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isHovering, images.length, currentImageIndex]);
 
   const handleAddToCart = async (event) => {
     // CORREÇÃO: Capturamos o botão ANTES da chamada assíncrona (await)

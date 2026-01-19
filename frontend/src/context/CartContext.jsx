@@ -24,6 +24,7 @@ export function CartProvider({ children }) {
       setCartCount(items.reduce((total, item) => total + (Number(item.quantity) || 0), 0));
     } catch (error) {
       console.error('Erro ao carregar carrinho:', error);
+      // Não fazer nada em caso de erro para não quebrar a aplicação
     }
   }, [user]);
 
@@ -61,6 +62,7 @@ export function CartProvider({ children }) {
       return true;
     } catch (error) {
       console.error('Erro ao adicionar ao carrinho:', error);
+      alert('Erro ao adicionar produto ao carrinho. Tente novamente.');
       return false;
     }
   };
@@ -77,7 +79,7 @@ export function CartProvider({ children }) {
 
   const updateQuantity = async (itemId, quantity) => {
     try {
-      await cartService.updateItemQuantity(itemId, quantity);
+      await cartService.updateQuantity(itemId, quantity);
       await loadCart();
     } catch (error) {
       console.error('Erro ao atualizar quantidade:', error);
@@ -85,21 +87,31 @@ export function CartProvider({ children }) {
     }
   };
 
-  const clearCart = () => {
-    setCartItems([]);
-    setCartCount(0);
+  const clearCart = async () => {
+    if (!user?.user_ID) return;
+    
+    try {
+      await cartService.clearCart(user.user_ID);
+      setCartItems([]);
+      setCartCount(0);
+    } catch (error) {
+      console.error('Erro ao limpar carrinho:', error);
+      throw error;
+    }
+  };
+
+  const value = {
+    cartItems,
+    cartCount,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    loadCart
   };
 
   return (
-    <CartContext.Provider value={{
-      cartItems,
-      cartCount,
-      addToCart,
-      removeFromCart,
-      updateQuantity,
-      clearCart,
-      loadCart
-    }}>
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );

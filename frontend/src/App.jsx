@@ -15,6 +15,8 @@ import Categories from './pages/Categories';
 import CategoryProducts from './pages/CategoryProducts';
 
 function App() {
+  const [currentPage, setCurrentPage] = useState('home');
+
   return (
       <Router>
         <AuthProvider>
