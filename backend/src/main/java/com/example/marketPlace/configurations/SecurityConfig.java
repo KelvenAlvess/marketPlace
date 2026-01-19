@@ -13,6 +13,10 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -33,48 +37,57 @@ public class SecurityConfig {
     }
 
     @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "http://127.0.0.1:3000"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         // Swagger e documentação
                         .requestMatchers("/", "/error").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
 
-                        // ⭐ CRIAÇÃO DE USUÁRIO - PÚBLICO
                         .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
 
-                        // Autenticação
+                        .requestMatchers("/api/test-email").permitAll() // Adicione isso junto com os outros permitAll
+
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/users/exists/**").permitAll()
 
-                        // Categorias
                         .requestMatchers("/api/categories/**").permitAll()
 
-                        // Produtos - leitura pública
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
 
-                        // Produtos - escrita protegida
                         .requestMatchers(HttpMethod.POST, "/api/products").hasRole("SELLER")
                         .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("SELLER")
                         .requestMatchers(HttpMethod.PATCH, "/api/products/**").hasRole("SELLER")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("SELLER")
 
-                        // Carrinho
                         .requestMatchers("/api/cart/**", "/api/cartitems/**").authenticated()
 
-                        // Pedidos
                         .requestMatchers("/api/orders/**").hasAnyRole("BUYER", "SELLER")
 
-                        // Pagamentos - somente compradores autenticados
+                        // Webhook deve vir ANTES da regra geral de payments
+                        .requestMatchers("/api/payments/webhook").permitAll()
                         .requestMatchers("/api/payments/**").hasRole("BUYER")
 
-                        // Usuários (outras operações)
                         .requestMatchers("/api/users/**").authenticated()
 
-                        // Resto
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -1,5 +1,6 @@
 package com.example.marketPlace.service;
 
+import com.example.marketPlace.dto.PaymentEventDTO;
 import com.example.marketPlace.dto.PaymentRequestDTO;
 import com.example.marketPlace.dto.PaymentResponseDTO;
 import com.example.marketPlace.exception.PaymentException;
@@ -9,17 +10,22 @@ import com.example.marketPlace.model.enums.PaymentMethod;
 import com.example.marketPlace.model.enums.PaymentStatus;
 import com.example.marketPlace.repository.OrderRepository;
 import com.example.marketPlace.repository.PaymentRepository;
+import com.example.marketPlace.service.messaging.PaymentProducer;
 import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.client.payment.PaymentCreateRequest;
 import com.mercadopago.client.payment.PaymentPayerRequest;
+import com.mercadopago.core.MPRequestOptions;
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -28,141 +34,211 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
+    private final PaymentProducer paymentProducer;
+
+    // --- Métodos de Criação (Mantidos iguais) ---
 
     @Transactional
     public PaymentResponseDTO processPayment(PaymentRequestDTO request) {
-        Order order = orderRepository.findById(request.orderId())
-                .orElseThrow(() -> new PaymentException("Pedido não encontrado"));
-
-        try {
-            PaymentClient client = new PaymentClient();
-
-            PaymentCreateRequest createRequest = PaymentCreateRequest.builder()
-                    .transactionAmount(order.getTotal())
-                    .token(request.token())
-                    .description("Pedido #" + order.getOrderId())
-                    .installments(request.installments() != null ? request.installments() : 1)
-                    .paymentMethodId(request.paymentMethodId())
-                    .payer(PaymentPayerRequest.builder()
-                            .email(request.email())
-                            .build())
-                    .build();
-
-            com.mercadopago.resources.payment.Payment mpPayment = client.create(createRequest);
-
-            Payment payment = new Payment();
-            payment.setAmount(order.getTotal());
-            payment.setPaymentDate(LocalDateTime.now());
-            payment.setPaymentMethod(mapPaymentMethod(request.paymentMethodId()));
-            payment.setTransactionId(mpPayment.getId().toString());
-            payment.setStatus(mapMercadoPagoStatus(mpPayment.getStatus()));
-            payment.setOrder(order);
-
-            Payment saved = paymentRepository.save(payment);
-
-            return new PaymentResponseDTO(
-                    saved.getPaymentId(),
-                    saved.getTransactionId(),
-                    saved.getAmount(),
-                    saved.getStatus(),
-                    null, null, null
-            );
-
-        } catch (MPApiException e) {
-            log.error("Erro API MP: {}", e.getApiResponse().getContent());
-            throw new PaymentException("Falha no pagamento: " + e.getMessage());
-        } catch (MPException e) {
-            log.error("Erro MP: {}", e.getMessage());
-            throw new PaymentException("Erro ao processar pagamento");
-        }
+        return createPaymentIntegration(request, request.paymentMethodId());
     }
 
     @Transactional
-    public PaymentResponseDTO processPixPayment(Long orderId, String email) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new PaymentException("Pedido não encontrado"));
+    public PaymentResponseDTO processPixPayment(PaymentRequestDTO request) {
+        return createPaymentIntegration(request, "pix");
+    }
+
+    // Lógica unificada de criação para evitar duplicação
+    private PaymentResponseDTO createPaymentIntegration(PaymentRequestDTO request, String methodId) {
+        // Validação de idempotency key
+        if (request.idempotencyKey() == null) {
+            throw new PaymentException("Chave de idempotência é obrigatória");
+        }
+
+        // Validação de idempotência
+        if (paymentRepository.existsByIdempotencyKey(request.idempotencyKey().toString())) {
+            throw new PaymentException("Transação já processada (Idempotência).");
+        }
+
+        // Busca o pedido
+        Order order = orderRepository.findById(request.orderId())
+                .orElseThrow(() -> new PaymentException("Pedido não encontrado com ID: " + request.orderId()));
+
+        // Validação do total do pedido
+        if (order.getTotal() == null || order.getTotal().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new PaymentException("Valor do pedido inválido");
+        }
 
         try {
             PaymentClient client = new PaymentClient();
 
-            PaymentCreateRequest createRequest = PaymentCreateRequest.builder()
+            PaymentCreateRequest.PaymentCreateRequestBuilder builder = PaymentCreateRequest.builder()
                     .transactionAmount(order.getTotal())
-                    .description("Pedido #" + order.getOrderId())
-                    .paymentMethodId("pix")
-                    .payer(PaymentPayerRequest.builder()
-                            .email(email)
-                            .build())
+                    .description("Pagamento Pedido #" + order.getOrderId())
+                    .paymentMethodId(methodId)
+                    .payer(PaymentPayerRequest.builder().email(request.email()).build());
+
+            // Para pagamentos que não são Pix, requer token e installments
+            if (!"pix".equals(methodId) && !"bolbradesco".equals(methodId)) {
+                if (request.token() == null || request.token().isBlank()) {
+                    throw new PaymentException("Token do cartão é obrigatório");
+                }
+                if (request.installments() == null || request.installments() < 1) {
+                    throw new PaymentException("Número de parcelas inválido");
+                }
+                builder.token(request.token()).installments(request.installments());
+            }
+
+            MPRequestOptions options = MPRequestOptions.builder()
+                    .customHeaders(Map.of("X-Idempotency-Key", request.idempotencyKey().toString()))
                     .build();
 
-            com.mercadopago.resources.payment.Payment mpPayment = client.create(createRequest);
+            com.mercadopago.resources.payment.Payment mpPayment = client.create(builder.build(), options);
+            return saveAndMapPayment(mpPayment, order, request.idempotencyKey().toString());
 
-            Payment payment = new Payment();
-            payment.setAmount(order.getTotal());
-            payment.setPaymentDate(LocalDateTime.now());
-            payment.setPaymentMethod(PaymentMethod.PIX);
-            payment.setTransactionId(mpPayment.getId().toString());
-            payment.setStatus(mapMercadoPagoStatus(mpPayment.getStatus()));
-            payment.setOrder(order);
-
-            Payment saved = paymentRepository.save(payment);
-
-            var pixInfo = mpPayment.getPointOfInteraction().getTransactionData();
-
-            return new PaymentResponseDTO(
-                    saved.getPaymentId(),
-                    saved.getTransactionId(),
-                    saved.getAmount(),
-                    saved.getStatus(),
-                    pixInfo.getQrCode(),
-                    pixInfo.getQrCodeBase64(),
-                    null
-            );
-
-        } catch (MPApiException | MPException e) {
-            log.error("Erro PIX: {}", e.getMessage());
-            throw new PaymentException("Erro ao gerar PIX");
+        } catch (PaymentException e) {
+            // Re-lança exceções de negócio
+            throw e;
+        } catch (MPApiException e) {
+            log.error("Erro Mercado Pago API: Status={}, Message={}", e.getStatusCode(), e.getMessage(), e);
+            throw new PaymentException("Erro ao processar pagamento no Mercado Pago: " + e.getMessage());
+        } catch (MPException e) {
+            log.error("Erro Mercado Pago: ", e);
+            throw new PaymentException("Erro ao comunicar com Mercado Pago: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("Erro inesperado ao processar pagamento: ", e);
+            throw new PaymentException("Erro inesperado ao processar pagamento");
         }
+    }
+
+    // --- Lógica de Atualização (Webhook & Fallback) ---
+
+    @Transactional
+    public void processWebhook(String topic, String id) {
+        if (!"payment".equals(topic)) return;
+
+        try {
+            PaymentClient client = new PaymentClient();
+            com.mercadopago.resources.payment.Payment mpPayment = client.get(Long.parseLong(id));
+
+            // Busca o pagamento no nosso banco
+            Payment localPayment = paymentRepository.findByTransactionId(id).orElse(null);
+
+            // Chama o método centralizado de atualização
+            if (localPayment != null) {
+                updateLocalPaymentStatus(localPayment, mpPayment.getStatus());
+            }
+        } catch (MPException | MPApiException e) {
+            log.error("Erro webhook: ", e);
+        }
+    }
+
+    /**
+     * NOVO: Método chamado pelo Cron Job para verificar pendências
+     */
+    @Transactional
+    public void reconcilePendingPayments() {
+        // Busca pagamentos PENDING criados há mais de 5 minutos
+        LocalDateTime cutOffTime = LocalDateTime.now().minusMinutes(5);
+        List<Payment> pendingPayments = paymentRepository.findByStatusAndPaymentDateBefore(PaymentStatus.PENDING, cutOffTime);
+
+        if (pendingPayments.isEmpty()) return;
+
+        log.info("Reconciliador: Verificando {} pagamentos pendentes...", pendingPayments.size());
+        PaymentClient client = new PaymentClient();
+
+        for (Payment payment : pendingPayments) {
+            try {
+                // Consulta manual na API do Mercado Pago
+                com.mercadopago.resources.payment.Payment mpPayment = client.get(Long.parseLong(payment.getTransactionId()));
+
+                // Tenta atualizar
+                boolean changed = updateLocalPaymentStatus(payment, mpPayment.getStatus());
+                if (changed) {
+                    log.info("Reconciliador: Pagamento {} recuperado! Novo status: {}", payment.getTransactionId(), mpPayment.getStatus());
+                }
+            } catch (Exception e) {
+                log.error("Falha ao reconciliar pagamento " + payment.getTransactionId(), e);
+            }
+        }
+    }
+
+    /**
+     * Lógica Centralizada de Aprovação.
+     * Retorna true se houve mudança de status.
+     */
+    private boolean updateLocalPaymentStatus(Payment payment, String mpStatusRaw) {
+        PaymentStatus newStatus = mapMercadoPagoStatus(mpStatusRaw);
+
+        if (payment.getStatus() != newStatus) {
+            log.info("Atualizando status do pagamento {} de {} para {}", payment.getTransactionId(), payment.getStatus(), newStatus);
+            payment.setStatus(newStatus);
+            paymentRepository.save(payment);
+
+            // Se aprovado, dispara Mensageria (E-mail, WebSocket, etc)
+            if (newStatus == PaymentStatus.COMPLETED) {
+                PaymentEventDTO event = new PaymentEventDTO(
+                        payment.getOrder().getOrderId(),
+                        "cliente@email.com", // Ajustar para pegar do user real
+                        payment.getAmount(),
+                        newStatus.toString(),
+                        payment.getTransactionId()
+                );
+                paymentProducer.sendPaymentSuccess(event);
+            }
+            return true;
+        }
+        return false;
     }
 
     public PaymentResponseDTO getPaymentStatus(String transactionId) {
-        try {
-            PaymentClient client = new PaymentClient();
-            com.mercadopago.resources.payment.Payment mpPayment = client.get(Long.parseLong(transactionId));
+        Payment payment = paymentRepository.findByTransactionId(transactionId)
+                .orElseThrow(() -> new PaymentException("Pagamento não encontrado"));
+        return mapToResponse(payment, null, null);
+    }
 
-            Payment payment = paymentRepository.findByTransactionId(transactionId)
-                    .orElseThrow(() -> new PaymentException("Pagamento não encontrado"));
+    // --- Mappers e Auxiliares (Iguais) ---
+    private PaymentResponseDTO saveAndMapPayment(com.mercadopago.resources.payment.Payment mpPayment, Order order, String idempotencyKey) {
+        Payment payment = new Payment();
+        payment.setAmount(mpPayment.getTransactionAmount());
+        payment.setPaymentDate(LocalDateTime.now());
+        payment.setPaymentMethod(mapPaymentMethod(mpPayment.getPaymentMethodId()));
+        payment.setStatus(mapMercadoPagoStatus(mpPayment.getStatus()));
+        payment.setTransactionId(mpPayment.getId().toString());
+        payment.setIdempotencyKey(idempotencyKey);
+        payment.setOrder(order);
+        paymentRepository.save(payment);
 
-            payment.setStatus(mapMercadoPagoStatus(mpPayment.getStatus()));
-            paymentRepository.save(payment);
-
-            return new PaymentResponseDTO(
-                    payment.getPaymentId(),
-                    payment.getTransactionId(),
-                    payment.getAmount(),
-                    payment.getStatus(),
-                    null, null, null
-            );
-
-        } catch (MPException | MPApiException e) {
-            throw new PaymentException("Erro ao consultar pagamento");
+        String qrCode = null;
+        String qrCodeBase64 = null;
+        if (mpPayment.getPointOfInteraction() != null && mpPayment.getPointOfInteraction().getTransactionData() != null) {
+            qrCode = mpPayment.getPointOfInteraction().getTransactionData().getQrCode();
+            qrCodeBase64 = mpPayment.getPointOfInteraction().getTransactionData().getQrCodeBase64();
         }
+        return mapToResponse(payment, qrCode, qrCodeBase64);
+    }
+
+    private PaymentResponseDTO mapToResponse(Payment payment, String qrCode, String qrCodeBase64) {
+        return new PaymentResponseDTO(payment.getPaymentId(), payment.getTransactionId(), payment.getAmount(), payment.getStatus(), qrCode, qrCodeBase64, null);
     }
 
     private PaymentStatus mapMercadoPagoStatus(String status) {
+        if (status == null) return PaymentStatus.PENDING;
         return switch (status) {
             case "approved" -> PaymentStatus.COMPLETED;
             case "pending", "in_process", "authorized" -> PaymentStatus.PENDING;
-            case "refunded" -> PaymentStatus.REFUNDED;
+            case "refunded", "cancelled", "rejected" -> PaymentStatus.REFUNDED; // Adicionei rejected
             default -> PaymentStatus.FAILED;
         };
     }
 
     private PaymentMethod mapPaymentMethod(String methodId) {
+        if (methodId == null) return PaymentMethod.CREDIT_CARD;
         return switch (methodId.toLowerCase()) {
             case "pix" -> PaymentMethod.PIX;
             case "bolbradesco" -> PaymentMethod.BANK_TRANSFER;
             case "debit_card" -> PaymentMethod.DEBIT_CARD;
-            default -> PaymentMethod.CREIDIT_CARD;
+            default -> PaymentMethod.CREDIT_CARD;
         };
     }
 }

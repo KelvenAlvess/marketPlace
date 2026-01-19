@@ -1,95 +1,139 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import userService from '../service/userService';
+import api from '../service/api';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Verificar se há usuário salvo no localStorage
+  // 1. Inicialização do Estado
+  const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    if (!savedUser || savedUser === 'undefined') return null;
+    try {
+      return JSON.parse(savedUser);
+    } catch (error) {
+      localStorage.removeItem('user');
+      return null;
     }
-    setLoading(false);
+  });
+
+  const [loading, setLoading] = useState(false);
+
+  // 2. Função de Logout (precisa ser useCallback para usar no interceptor)
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    delete api.defaults.headers.common['Authorization'];
+    // Opcional: Redirecionar para login
+    window.location.href = '/login';
   }, []);
+
+  // 3. Configuração Inicial e Interceptor de Expiração
+  useEffect(() => {
+    const savedToken = localStorage.getItem('token');
+
+    if (savedToken) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+    }
+
+    // INTERCEPTOR: Se o backend devolver 401/403 (Token inválido/expirado), desloga.
+    const interceptorId = api.interceptors.response.use(
+        response => response,
+        error => {
+          if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+            console.warn("Sessão expirada. Deslogando...");
+            logout();
+          }
+          return Promise.reject(error);
+        }
+    );
+
+    // Remove o interceptor quando o componente desmontar
+    return () => {
+      api.interceptors.response.eject(interceptorId);
+    };
+  }, [logout]);
 
   const login = async (email, password) => {
     try {
-      // Buscar usuário por email
-      const userData = await userService.getUserByEmail(email);
-      
-      // Por enquanto, aceita qualquer senha já que o backend não retorna a senha
-      // Em produção, você precisaria de um endpoint de login que valide a senha no backend
-      if (userData) {
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        return { success: true };
-      } else {
-        return { success: false, error: 'Usuário não encontrado' };
-      }
+      setLoading(true);
+      const response = await userService.login(email, password);
+
+      const { token, ...userData } = response;
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      setUser(userData);
+
+      return { success: true };
     } catch (error) {
-      console.error('Erro ao fazer login:', error);
-      if (error.response?.status === 404) {
-        return { success: false, error: 'Email não encontrado' };
-      }
-      return { success: false, error: 'Erro ao fazer login. Tente novamente.' };
+      console.error('Erro no login:', error);
+      return { success: false, error: 'Email ou senha inválidos' };
+    } finally {
+      setLoading(false);
     }
   };
 
   const register = async (userData) => {
     try {
-      // Verificar se email já existe
-      const emailExists = await userService.existsByEmail(userData.email);
-      if (emailExists) {
-        return { success: false, error: 'Email já cadastrado' };
-      }
+      setLoading(true);
+      const roles = userData.role === 'SELLER' ? ['SELLER', 'BUYER'] : ['BUYER'];
 
-      // Criar novo usuário
-      const newUser = await userService.createUser({
+      const newUserConfig = {
         userName: userData.name,
         email: userData.email,
         password: userData.password,
         cpf: userData.cpf,
         phoneNumber: userData.phone,
         address: userData.address,
-        roles: ["BUYER"] // Usuário padrão como comprador
-      });
+        roles: roles
+      };
 
-      setUser(newUser);
-      localStorage.setItem('user', JSON.stringify(newUser));
+      await userService.createUser(newUserConfig);
       return { success: true };
     } catch (error) {
       console.error('Erro ao registrar:', error);
-      return { success: false, error: 'Erro ao criar conta. Verifique os dados.' };
+      const msg = error.response?.data?.message || 'Erro ao criar conta.';
+      return { success: false, error: msg };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
+  // 4. NOVA FUNÇÃO: Atualiza dados do usuário localmente
+  // Útil quando o Checkout atualiza o endereço/telefone
+  const updateUserLocal = (updatedData) => {
+    setUser(prevUser => {
+      const newUser = { ...prevUser, ...updatedData };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
+    });
   };
 
-  const isAuthenticated = () => {
-    return user !== null;
-  };
+  // 5. Helpers de Verificação
+  const isAuthenticated = () => !!user && !!localStorage.getItem('token');
+
+  const hasRole = (role) => user?.roles?.includes(role);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      login,
-      register,
-      logout,
-      isAuthenticated
-    }}>
-      {children}
-    </AuthContext.Provider>
+      <AuthContext.Provider value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        updateUserLocal, // Exposta para usar no Checkout
+        isAuthenticated,
+        hasRole
+      }}>
+        {children}
+      </AuthContext.Provider>
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

@@ -8,7 +8,7 @@ public record PaymentResponseDTO(
         String transactionId,
         BigDecimal amount,
         PaymentStatus status,
-        String qrCode,          // Para PIX
-        String qrCodeBase64,    // Para PIX
-        String ticketUrl        // Para boleto
+        String qrCode,
+        String qrCodeBase64,
+        String ticketUrl
 ) {}

@@ -1,6 +1,12 @@
 import api from './api';
 
 const userService = {
+  // Login
+  login: async (email, password) => {
+    const response = await api.post('/auth/login', { email, password });
+    return response.data;
+  },
+
   // Criar novo usuário
   createUser: async (userData) => {
     const response = await api.post('/users', userData);

@@ -4,6 +4,7 @@ import com.example.marketPlace.model.User;
 import com.example.marketPlace.repository.UserRepository;
 import com.example.marketPlace.dto.UserCreateDTO;
 import com.example.marketPlace.dto.UserResponseDTO;
+import com.example.marketPlace.dto.UserUpdateDTO; // Importe o DTO
 import com.example.marketPlace.exception.UserAlreadyExistsException;
 import com.example.marketPlace.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -40,58 +41,45 @@ public class UserService {
         user.setEmail(dto.email());
         user.setCpf(dto.cpf());
         user.setPhoneNumber(dto.phoneNumber());
-        user.setPassword(bCryptPasswordEncoder.encode(dto.password()));
         user.setAddress(dto.address());
         user.setRoles(dto.roles());
+        user.setPassword(bCryptPasswordEncoder.encode(dto.password()));
         user.setCreatedAt(LocalDateTime.now());
 
         User savedUser = userRepository.save(user);
-        log.info("Usuário criado com sucesso. ID: {}, Roles: {}", savedUser.getUserId(), savedUser.getRoles());
+        log.info("Usuário criado com sucesso. ID: {}", savedUser.getUserId());
 
         return UserResponseDTO.from(savedUser);
     }
 
     @Transactional(readOnly = true)
     public UserResponseDTO getUserById(Long id) {
-        log.info("Buscando usuário por ID: {}", id);
-
         User user = userRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.warn("Usuário não encontrado. ID: {}", id);
-                    return new UserNotFoundException("Usuário não encontrado com ID: " + id);
-                });
-
+                .orElseThrow(() -> new UserNotFoundException(id));
         return UserResponseDTO.from(user);
     }
 
     @Transactional(readOnly = true)
     public UserResponseDTO getUserByEmail(String email) {
-        log.info("Buscando usuário por email: {}", email);
-
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> {
-                    log.warn("Usuário não encontrado. Email: {}", email);
-                    return new UserNotFoundException("Usuário não encontrado com email: " + email);
-                });
-
+                .orElseThrow(() -> new UserNotFoundException("Usuário não encontrado com email: " + email));
         return UserResponseDTO.from(user);
     }
 
     @Transactional(readOnly = true)
     public List<UserResponseDTO> getAllUsers() {
-        log.info("Listando todos os usuários");
-
         return userRepository.findAll().stream()
                 .map(UserResponseDTO::from)
                 .collect(Collectors.toList());
     }
 
+    // --- CORREÇÃO: Método aceita UserUpdateDTO ---
     @Transactional
-    public UserResponseDTO updateUser(Long id, UserCreateDTO dto) {
+    public UserResponseDTO updateUser(Long id, UserUpdateDTO dto) {
         log.info("Atualizando usuário. ID: {}", id);
 
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("Usuário não encontrado com ID: " + id));
+                .orElseThrow(() -> new UserNotFoundException(id));
 
         if (!user.getEmail().equals(dto.email()) && userRepository.existsByEmail(dto.email())) {
             throw new UserAlreadyExistsException("Email já cadastrado: " + dto.email());
@@ -106,8 +94,11 @@ public class UserService {
         user.setCpf(dto.cpf());
         user.setPhoneNumber(dto.phoneNumber());
         user.setAddress(dto.address());
-        user.setRoles(dto.roles());
+        if (dto.roles() != null) {
+            user.setRoles(dto.roles());
+        }
 
+        // Lógica de senha: Só atualiza se vier preenchida
         if (dto.password() != null && !dto.password().isEmpty()) {
             user.setPassword(bCryptPasswordEncoder.encode(dto.password()));
         }
@@ -117,6 +108,7 @@ public class UserService {
 
         return UserResponseDTO.from(updatedUser);
     }
+    // ---------------------------------------------
 
     @Transactional
     public void deleteUser(Long id) {
