@@ -20,21 +20,63 @@ import com.mercadopago.exceptions.MPException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
 
+    @Value("${mercadopago.webhook.secret}")
+    private String webhookSecret;
+
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final PaymentProducer paymentProducer;
+
+    public boolean validateWebhookSignature(String xSignature, String xRequestId, String dataId) {
+        try {
+            String[] parts = xSignature.split(",");
+            String ts = null;
+            String hash = null;
+
+            for (String part : parts) {
+                String[] kv = part.split("=", 2);
+                if (kv.length == 2) {
+                    if (kv[0].trim().equals("ts")) ts = kv[1].trim();
+                    if (kv[0].trim().equals("v1")) hash = kv[1].trim();
+                }
+            }
+
+            if (ts == null || hash == null) return false;
+
+            String manifest = String.format("id:%s;request-id:%s;ts:%s;", dataId, xRequestId, ts);
+
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            javax.crypto.spec.SecretKeySpec secretKeySpec = new javax.crypto.spec.SecretKeySpec(webhookSecret.getBytes(), "HmacSHA256");
+            mac.init(secretKeySpec);
+            byte[] hmacData = mac.doFinal(manifest.getBytes());
+
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hmacData) {
+                sb.append(String.format("%02x", b));
+            }
+
+            return sb.toString().equals(hash);
+
+        } catch (Exception e) {
+            log.error("Erro ao validar assinatura do webhook", e);
+            return false;
+        }
+    }
 
     @Transactional
     public PaymentResponseDTO processPayment(PaymentRequestDTO request) {
@@ -51,13 +93,18 @@ public class PaymentService {
         if (request.idempotencyKey() == null) {
             throw new PaymentException("Chave de idempotência é obrigatória");
         }
-
         if (paymentRepository.existsByIdempotencyKey(request.idempotencyKey().toString())) {
             throw new PaymentException("Transação já processada (Idempotência).");
         }
 
         Order order = orderRepository.findById(request.orderId())
                 .orElseThrow(() -> new PaymentException("Pedido não encontrado com ID: " + request.orderId()));
+
+        if (!order.getBuyer().getEmail().equalsIgnoreCase(request.email())) {
+            log.warn("Tentativa de pagamento suspeita! Usuário {} tentou pagar pedido #{} de {}",
+                    request.email(), order.getOrderId(), order.getBuyer().getEmail());
+            throw new PaymentException("Você não tem permissão para processar este pedido.");
+        }
 
         if (order.getTotal() == null || order.getTotal().compareTo(BigDecimal.ZERO) <= 0) {
             throw new PaymentException("Valor do pedido inválido");
@@ -77,10 +124,9 @@ public class PaymentService {
                 if (request.token() == null || request.token().isBlank()) {
                     throw new PaymentException("Token do cartão é obrigatório");
                 }
-                if (request.installments() == null || request.installments() < 1) {
-                    throw new PaymentException("Número de parcelas inválido");
-                }
-                builder.token(request.token()).installments(request.installments());
+                // Fallback seguro para parcelas
+                int installments = (request.installments() != null && request.installments() > 0) ? request.installments() : 1;
+                builder.token(request.token()).installments(installments);
             }
 
             MPRequestOptions options = MPRequestOptions.builder()
@@ -112,17 +158,21 @@ public class PaymentService {
             PaymentClient client = new PaymentClient();
             com.mercadopago.resources.payment.Payment mpPayment = client.get(Long.parseLong(id));
 
-            // Busca o pagamento no nosso banco
-            Payment localPayment = paymentRepository.findByTransactionId(id).orElse(null);
+            Optional<Payment> localPaymentOpt = paymentRepository.findByTransactionId(id);
 
-            if (localPayment != null) {
+            if (localPaymentOpt.isPresent()) {
+                Payment localPayment = localPaymentOpt.get();
                 updateLocalPaymentStatus(localPayment, mpPayment.getStatus());
+            } else {
+                log.warn("Webhook recebido para pagamento {} não encontrado no banco local.", id);
             }
+
         } catch (MPException | MPApiException e) {
-            log.error("Erro webhook: ", e);
+            log.error("Erro ao processar webhook para ID {}: ", id, e);
         }
     }
 
+    @Scheduled(fixedRate = 300000)
     @Transactional
     public void reconcilePendingPayments() {
         LocalDateTime cutOffTime = LocalDateTime.now().minusMinutes(5);
@@ -136,8 +186,8 @@ public class PaymentService {
         for (Payment payment : pendingPayments) {
             try {
                 com.mercadopago.resources.payment.Payment mpPayment = client.get(Long.parseLong(payment.getTransactionId()));
-
                 boolean changed = updateLocalPaymentStatus(payment, mpPayment.getStatus());
+
                 if (changed) {
                     log.info("Reconciliador: Pagamento {} recuperado! Novo status: {}", payment.getTransactionId(), mpPayment.getStatus());
                 }
@@ -156,9 +206,7 @@ public class PaymentService {
             paymentRepository.save(payment);
 
             if (newStatus == PaymentStatus.COMPLETED) {
-
                 String userEmail = payment.getOrder().getBuyer().getEmail();
-
                 PaymentEventDTO event = new PaymentEventDTO(
                         payment.getOrder().getOrderId(),
                         userEmail,
@@ -192,10 +240,7 @@ public class PaymentService {
         paymentRepository.save(payment);
 
         if (payment.getStatus() == PaymentStatus.COMPLETED) {
-            log.info("Pagamento aprovado imediatamente. Disparando evento de confirmação.");
-
             String userEmail = order.getBuyer().getEmail();
-
             PaymentEventDTO event = new PaymentEventDTO(
                     order.getOrderId(),
                     userEmail,
@@ -224,7 +269,7 @@ public class PaymentService {
         return switch (status) {
             case "approved" -> PaymentStatus.COMPLETED;
             case "pending", "in_process", "authorized" -> PaymentStatus.PENDING;
-            case "refunded", "cancelled", "rejected" -> PaymentStatus.REFUNDED; // Adicionei rejected
+            case "refunded", "cancelled", "rejected" -> PaymentStatus.REFUNDED;
             default -> PaymentStatus.FAILED;
         };
     }

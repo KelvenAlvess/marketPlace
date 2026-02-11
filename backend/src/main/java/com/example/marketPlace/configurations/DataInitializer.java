@@ -28,33 +28,25 @@ public class DataInitializer implements CommandLineRunner {
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
     private final CartItemRepository cartItemRepository;
-    // Se você tiver InvoiceRepository, injete ele aqui. Se não tiver, apague as linhas referentes a ele.
-    // private final InvoiceRepository invoiceRepository;
 
     private final PasswordEncoder passwordEncoder;
 
     @Override
-    // RETIREI O @Transactional PARA FORÇAR O DELETE IMEDIATO
+
     public void run(String... args) {
         try {
             log.info("Iniciando carga de dados...");
 
-            // 1. LIMPEZA TOTAL (Ordem Obrigatória: Filhos -> Pais)
-            // Se não limpar nessa ordem, o banco bloqueia.
 
-            cartItemRepository.deleteAll(); // Limpa Carrinho
+            cartItemRepository.deleteAll();
 
-            // Se tiver InvoiceRepository, descomente a linha abaixo:
-            // invoiceRepository.deleteAll();
-
-            orderRepository.deleteAll();    // Limpa Pedidos (e cascadeia para Itens de Pedido e Pagamentos)
-            productRepository.deleteAll();  // Limpa Produtos
-            categoryRepository.deleteAll(); // Limpa Categorias
-            userRepository.deleteAll();     // Limpa Usuários (Agora o banco está vazio de verdade)
+            orderRepository.deleteAll();
+            productRepository.deleteAll();
+            categoryRepository.deleteAll();
+            userRepository.deleteAll();
 
             log.info("Banco limpo com sucesso!");
 
-            // 2. CRIAR USUÁRIOS
             User admin = new User();
             admin.setUsername("Admin Master");
             admin.setEmail("kelvengomes123321@gmail.com");
@@ -78,7 +70,6 @@ public class DataInitializer implements CommandLineRunner {
             userRepository.saveAll(Arrays.asList(admin, buyer));
             log.info("Usuários criados!");
 
-            // 3. CRIAR CATEGORIAS
             Category catEletronicos = new Category();
             catEletronicos.setName("Eletrônicos");
             catEletronicos.setDescription("Gadgets e dispositivos");
@@ -102,9 +93,6 @@ public class DataInitializer implements CommandLineRunner {
             categoryRepository.saveAll(Arrays.asList(catEletronicos, catRoupas, catLivros, catCasa, catGamer));
             log.info("Categorias criadas!");
 
-            // 4. CRIAR PRODUTOS (Com Pesos e Dimensões Reais para Frete)
-
-            // --- Eletrônicos ---
             Product p1 = new Product();
             p1.setProductName("Notebook Dell Inspiron");
             p1.setDescription("Intel Core i5, 8GB RAM, SSD 256GB, Tela 15.6 Full HD.");
@@ -135,7 +123,6 @@ public class DataInitializer implements CommandLineRunner {
             p3.setImage("https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=800&q=80");
             p3.setWeight(18.0); p3.setHeight(80); p3.setWidth(15); p3.setLength(120);
 
-            // --- Roupas ---
             Product p4 = new Product();
             p4.setProductName("Camiseta Básica Branca");
             p4.setDescription("100% Algodão, corte slim fit, super confortável.");
@@ -156,7 +143,6 @@ public class DataInitializer implements CommandLineRunner {
             p5.setImage("https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80");
             p5.setWeight(0.9); p5.setHeight(12); p5.setWidth(20); p5.setLength(32);
 
-            // --- Livros ---
             Product p6 = new Product();
             p6.setProductName("O Senhor dos Anéis: A Sociedade do Anel");
             p6.setDescription("Edição de luxo capa dura, J.R.R. Tolkien.");
@@ -177,7 +163,6 @@ public class DataInitializer implements CommandLineRunner {
             p7.setImage("https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&w=800&q=80");
             p7.setWeight(0.6); p7.setHeight(3); p7.setWidth(17); p7.setLength(24);
 
-            // --- Casa ---
             Product p8 = new Product();
             p8.setProductName("Sofá Retrátil 3 Lugares");
             p8.setDescription("Tecido Suede aveludado, cor cinza, muito confortável.");
@@ -198,7 +183,6 @@ public class DataInitializer implements CommandLineRunner {
             p9.setImage("https://images.unsplash.com/photo-1507473883581-c01599505222?auto=format&fit=crop&w=800&q=80");
             p9.setWeight(1.5); p9.setHeight(30); p9.setWidth(20); p9.setLength(20);
 
-            // --- Gamer ---
             Product p10 = new Product();
             p10.setProductName("Cadeira Gamer RGB");
             p10.setDescription("Ergonômica, reclinável, com iluminação LED controlável.");
