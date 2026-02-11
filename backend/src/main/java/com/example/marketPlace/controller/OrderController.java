@@ -94,7 +94,6 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
-
     @Operation(
             summary = "Listar todos os pedidos",
             description = "Retorna todos os pedidos do sistema. Endpoint para administradores."
@@ -208,6 +207,24 @@ public class OrderController {
 
         log.info("Pedido ID: {} deletado com sucesso", orderId);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "Atualizar custo de frete",
+            description = "Atualiza o valor do frete do pedido e recalcula o total."
+    )
+    @PatchMapping("/{orderId}/shipping")
+    public ResponseEntity<OrderResponseDTO> updateShipping(
+            @Parameter(description = "ID do pedido", required = true)
+            @PathVariable Long orderId,
+            @RequestBody java.util.Map<String, java.math.BigDecimal> payload) {
+
+        java.math.BigDecimal cost = payload.get("shippingCost");
+        log.info("PATCH /api/orders/{}/shipping - Atualizando frete para R$ {}", orderId, cost);
+
+        OrderResponseDTO order = orderService.updateShippingCost(orderId, cost);
+
+        return ResponseEntity.ok(order);
     }
 }
 

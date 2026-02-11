@@ -236,4 +236,71 @@ public class OrderService {
                 })
                 .collect(Collectors.toList());
     }
+    @Transactional
+    public OrderResponseDTO updateShippingCost(Long orderId, BigDecimal shippingCost) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new RuntimeException("Não é possível alterar frete de pedido finalizado");
+        }
+
+        BigDecimal itemsTotal = order.getItems().stream()
+                .map(OrderItem::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        order.setShippingCost(shippingCost);
+        order.setTotal(itemsTotal.add(shippingCost));
+
+        Order savedOrder = orderRepository.save(order);
+        return toDTO(savedOrder);
+    }
+
+    @Transactional
+    public void decrementStock(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+
+        for (OrderItem item : order.getItems()) {
+            Product product = item.getProduct();
+            int newQty = product.getStockQuantity() - item.getQuantity();
+            if (newQty < 0) {
+                throw new RuntimeException("Estoque insuficiente para: " + product.getProductName());
+            }
+            product.setStockQuantity(newQty);
+            productRepository.save(product);
+        }
+    }
+
+    // === CONVERSOR ===
+    private OrderResponseDTO toDTO(Order order) {
+        // Converte os itens primeiro
+        List<OrderItemResponseDTO> itemsDTO = order.getItems().stream()
+                .map(item -> new OrderItemResponseDTO(
+                        item.getOrderItemId(),
+                        item.getProduct().getProductId(),
+                        item.getProduct().getProductName(),
+                        item.getProduct().getImage(), // A imagem que o front precisa
+                        item.getQuantity(),
+                        item.getUnitPrice(),
+                        item.getSubtotal()
+                ))
+                .collect(Collectors.toList());
+
+        return OrderResponseDTO.from(order, itemsDTO);
+    }
+
+    @Transactional
+    public void approveOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+
+        if (order.getStatus() == OrderStatus.PAID) {
+            return;
+        }
+        order.setStatus(OrderStatus.PAID);
+        orderRepository.save(order);
+
+        decrementStock(orderId);
+    }
 }

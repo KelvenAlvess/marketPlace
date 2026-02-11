@@ -43,4 +43,7 @@ public class Order {
 
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL)
     private Payment payment;
+
+    @Column(name = "shipping_cost")
+    private BigDecimal shippingCost = BigDecimal.ZERO;
 }

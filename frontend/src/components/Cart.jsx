@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; // Hook de navegação
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import orderService from '../service/orderService';
+import orderService from '../service/orderService.js';
 
 function Cart({ isOpen, onClose }) {
   const { cartItems, removeFromCart, updateQuantity, loadCart } = useCart();

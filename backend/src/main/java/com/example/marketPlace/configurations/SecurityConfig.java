@@ -82,7 +82,6 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/orders/**").hasAnyRole("BUYER", "SELLER")
 
-                        // Webhook deve vir ANTES da regra geral de payments
                         .requestMatchers("/api/payments/webhook").permitAll()
                         .requestMatchers("/api/payments/**").hasRole("BUYER")
 

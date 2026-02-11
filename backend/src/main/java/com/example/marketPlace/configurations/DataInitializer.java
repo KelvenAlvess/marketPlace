@@ -4,9 +4,7 @@ import com.example.marketPlace.model.Category;
 import com.example.marketPlace.model.Product;
 import com.example.marketPlace.model.User;
 import com.example.marketPlace.model.enums.UserRole;
-import com.example.marketPlace.repository.CategoryRepository;
-import com.example.marketPlace.repository.ProductRepository;
-import com.example.marketPlace.repository.UserRepository;
+import com.example.marketPlace.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -28,22 +26,38 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private final OrderRepository orderRepository;
+    private final CartItemRepository cartItemRepository;
+    // Se você tiver InvoiceRepository, injete ele aqui. Se não tiver, apague as linhas referentes a ele.
+    // private final InvoiceRepository invoiceRepository;
+
     private final PasswordEncoder passwordEncoder;
 
     @Override
+    // RETIREI O @Transactional PARA FORÇAR O DELETE IMEDIATO
     public void run(String... args) {
         try {
             log.info("Iniciando carga de dados...");
 
-            // 1. LIMPEZA (Ordem correta para evitar violação de FK)
-            productRepository.deleteAll();
-            categoryRepository.deleteAll();
-            userRepository.deleteAll();
+            // 1. LIMPEZA TOTAL (Ordem Obrigatória: Filhos -> Pais)
+            // Se não limpar nessa ordem, o banco bloqueia.
+
+            cartItemRepository.deleteAll(); // Limpa Carrinho
+
+            // Se tiver InvoiceRepository, descomente a linha abaixo:
+            // invoiceRepository.deleteAll();
+
+            orderRepository.deleteAll();    // Limpa Pedidos (e cascadeia para Itens de Pedido e Pagamentos)
+            productRepository.deleteAll();  // Limpa Produtos
+            categoryRepository.deleteAll(); // Limpa Categorias
+            userRepository.deleteAll();     // Limpa Usuários (Agora o banco está vazio de verdade)
+
+            log.info("Banco limpo com sucesso!");
 
             // 2. CRIAR USUÁRIOS
             User admin = new User();
             admin.setUsername("Admin Master");
-            admin.setEmail("admin@marketplace.com");
+            admin.setEmail("kelvengomes123321@gmail.com");
             admin.setPassword(passwordEncoder.encode("admin123"));
             admin.setCpf("00000000000");
             admin.setPhoneNumber("11999999999");
@@ -61,8 +75,6 @@ public class DataInitializer implements CommandLineRunner {
             buyer.setRoles(Set.of(UserRole.BUYER));
             buyer.setCreatedAt(LocalDateTime.now());
 
-            // Salvamos e recuperamos para garantir que temos os IDs, mas
-            // como estamos na mesma transação, o objeto 'admin' já serve.
             userRepository.saveAll(Arrays.asList(admin, buyer));
             log.info("Usuários criados!");
 
@@ -90,7 +102,7 @@ public class DataInitializer implements CommandLineRunner {
             categoryRepository.saveAll(Arrays.asList(catEletronicos, catRoupas, catLivros, catCasa, catGamer));
             log.info("Categorias criadas!");
 
-            // 4. CRIAR PRODUTOS (Agora associando ao ADMIN)
+            // 4. CRIAR PRODUTOS (Com Pesos e Dimensões Reais para Frete)
 
             // --- Eletrônicos ---
             Product p1 = new Product();
@@ -99,8 +111,9 @@ public class DataInitializer implements CommandLineRunner {
             p1.setProductPrice(BigDecimal.valueOf(3500.00));
             p1.setStockQuantity(10);
             p1.setCategory(catEletronicos);
-            p1.setSeller(admin); // <--- CORREÇÃO AQUI
+            p1.setSeller(admin);
             p1.setImage("https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=800&q=80");
+            p1.setWeight(2.5); p1.setHeight(8); p1.setWidth(35); p1.setLength(45);
 
             Product p2 = new Product();
             p2.setProductName("Smartphone Samsung Galaxy S23");
@@ -108,8 +121,9 @@ public class DataInitializer implements CommandLineRunner {
             p2.setProductPrice(BigDecimal.valueOf(4200.00));
             p2.setStockQuantity(15);
             p2.setCategory(catEletronicos);
-            p2.setSeller(admin); // <--- CORREÇÃO AQUI
+            p2.setSeller(admin);
             p2.setImage("https://images.unsplash.com/photo-1610945265078-38584e12e4c9?auto=format&fit=crop&w=800&q=80");
+            p2.setWeight(0.4); p2.setHeight(5); p2.setWidth(10); p2.setLength(18);
 
             Product p3 = new Product();
             p3.setProductName("Smart TV LG 55 4K");
@@ -117,8 +131,9 @@ public class DataInitializer implements CommandLineRunner {
             p3.setProductPrice(BigDecimal.valueOf(2800.00));
             p3.setStockQuantity(5);
             p3.setCategory(catEletronicos);
-            p3.setSeller(admin); // <--- CORREÇÃO AQUI
+            p3.setSeller(admin);
             p3.setImage("https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=800&q=80");
+            p3.setWeight(18.0); p3.setHeight(80); p3.setWidth(15); p3.setLength(120);
 
             // --- Roupas ---
             Product p4 = new Product();
@@ -127,8 +142,9 @@ public class DataInitializer implements CommandLineRunner {
             p4.setProductPrice(BigDecimal.valueOf(49.90));
             p4.setStockQuantity(100);
             p4.setCategory(catRoupas);
-            p4.setSeller(admin); // <--- CORREÇÃO AQUI
+            p4.setSeller(admin);
             p4.setImage("https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=800&q=80");
+            p4.setWeight(0.2); p4.setHeight(2); p4.setWidth(20); p4.setLength(25);
 
             Product p5 = new Product();
             p5.setProductName("Tênis Esportivo Running");
@@ -136,8 +152,9 @@ public class DataInitializer implements CommandLineRunner {
             p5.setProductPrice(BigDecimal.valueOf(299.90));
             p5.setStockQuantity(30);
             p5.setCategory(catRoupas);
-            p5.setSeller(admin); // <--- CORREÇÃO AQUI
+            p5.setSeller(admin);
             p5.setImage("https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80");
+            p5.setWeight(0.9); p5.setHeight(12); p5.setWidth(20); p5.setLength(32);
 
             // --- Livros ---
             Product p6 = new Product();
@@ -146,8 +163,9 @@ public class DataInitializer implements CommandLineRunner {
             p6.setProductPrice(BigDecimal.valueOf(89.90));
             p6.setStockQuantity(50);
             p6.setCategory(catLivros);
-            p6.setSeller(admin); // <--- CORREÇÃO AQUI
+            p6.setSeller(admin);
             p6.setImage("https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80");
+            p6.setWeight(1.2); p6.setHeight(4); p6.setWidth(16); p6.setLength(23);
 
             Product p7 = new Product();
             p7.setProductName("Código Limpo");
@@ -155,8 +173,9 @@ public class DataInitializer implements CommandLineRunner {
             p7.setProductPrice(BigDecimal.valueOf(75.00));
             p7.setStockQuantity(20);
             p7.setCategory(catLivros);
-            p7.setSeller(admin); // <--- CORREÇÃO AQUI
+            p7.setSeller(admin);
             p7.setImage("https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&w=800&q=80");
+            p7.setWeight(0.6); p7.setHeight(3); p7.setWidth(17); p7.setLength(24);
 
             // --- Casa ---
             Product p8 = new Product();
@@ -165,8 +184,9 @@ public class DataInitializer implements CommandLineRunner {
             p8.setProductPrice(BigDecimal.valueOf(1800.00));
             p8.setStockQuantity(3);
             p8.setCategory(catCasa);
-            p8.setSeller(admin); // <--- CORREÇÃO AQUI
+            p8.setSeller(admin);
             p8.setImage("https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=800&q=80");
+            p8.setWeight(50.0); p8.setHeight(90); p8.setWidth(90); p8.setLength(100);
 
             Product p9 = new Product();
             p9.setProductName("Luminária de Mesa Industrial");
@@ -174,8 +194,9 @@ public class DataInitializer implements CommandLineRunner {
             p9.setProductPrice(BigDecimal.valueOf(120.00));
             p9.setStockQuantity(15);
             p9.setCategory(catCasa);
-            p9.setSeller(admin); // <--- CORREÇÃO AQUI
+            p9.setSeller(admin);
             p9.setImage("https://images.unsplash.com/photo-1507473883581-c01599505222?auto=format&fit=crop&w=800&q=80");
+            p9.setWeight(1.5); p9.setHeight(30); p9.setWidth(20); p9.setLength(20);
 
             // --- Gamer ---
             Product p10 = new Product();
@@ -184,8 +205,9 @@ public class DataInitializer implements CommandLineRunner {
             p10.setProductPrice(BigDecimal.valueOf(1200.00));
             p10.setStockQuantity(8);
             p10.setCategory(catGamer);
-            p10.setSeller(admin); // <--- CORREÇÃO AQUI
+            p10.setSeller(admin);
             p10.setImage("https://images.unsplash.com/photo-1598550476439-c9483294608c?auto=format&fit=crop&w=800&q=80");
+            p10.setWeight(18.0); p10.setHeight(60); p10.setWidth(30); p10.setLength(60);
 
             Product p11 = new Product();
             p11.setProductName("Headset Gamer Surround 7.1");
@@ -193,8 +215,9 @@ public class DataInitializer implements CommandLineRunner {
             p11.setProductPrice(BigDecimal.valueOf(350.00));
             p11.setStockQuantity(25);
             p11.setCategory(catGamer);
-            p11.setSeller(admin); // <--- CORREÇÃO AQUI
+            p11.setSeller(admin);
             p11.setImage("https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=800&q=80");
+            p11.setWeight(0.5); p11.setHeight(10); p11.setWidth(20); p11.setLength(25);
 
             productRepository.saveAll(Arrays.asList(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11));
 
