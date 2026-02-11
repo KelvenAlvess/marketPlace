@@ -356,8 +356,6 @@ function Checkout() {
                             amount: finalAmount,
                             payer: {
                               email: user.email || 'customer@test.com',
-                              // CORREÇÃO 2: Só envia identification se tiver CPF válido
-                              // Enviar objeto com string vazia pode bugar o brick
                               ...(payerCpf ? {
                                 identification: {
                                   type: 'CPF',
@@ -375,10 +373,12 @@ function Checkout() {
                             paymentMethods: {
                               maxInstallments: 12,
                               minInstallments: 1,
-                              // REMOVIDO 'types' para evitar conflito de detecção de BIN
                             },
                           }}
-                          onSubmit={handleCardSubmit}
+                          onSubmit={async (param) => {
+                            console.log('Dados do cartão:', param); // Para debug
+                            await handleCardSubmit(param);
+                          }}
                       />
                   )}
 

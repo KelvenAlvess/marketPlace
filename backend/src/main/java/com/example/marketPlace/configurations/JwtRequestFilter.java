@@ -30,7 +30,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
-        // Ignorar rotas públicas que não precisam de token para evitar processamento desnecessário
         String path = request.getRequestURI();
 
         // Swagger e documentação
@@ -82,9 +81,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
-                // CORREÇÃO: Envolvemos a busca do usuário em um try-catch.
-                // Se o banco foi resetado e o token é antigo, o loadUserByUsername lança exceção.
-                // Antes, isso causava erro 500. Agora, tratamos graciosamente.
+
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
                 if (jwtTokenUtil.validateToken(jwtToken, userDetails.getUsername())) {
@@ -95,8 +92,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 }
             } catch (UsernameNotFoundException e) {
                 log.warn("Usuário do token não encontrado no banco de dados (Token órfão): {}", username);
-                // Não fazemos nada: o SecurityContext continua null,
-                // e o Spring Security retornará 401 ou 403 dependendo da rota.
+
             }
         }
         chain.doFilter(request, response);
