@@ -2,6 +2,7 @@ package com.example.marketPlace.controller;
 
 import com.example.marketPlace.dto.UserCreateDTO;
 import com.example.marketPlace.dto.UserResponseDTO;
+import com.example.marketPlace.dto.UserUpdateDTO; // <--- Importe o novo DTO
 import com.example.marketPlace.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,7 +37,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Buscar usuário por ID", description = "Retorna os dados de um usuário pelo ID")
+    @Operation(summary = "Buscar usuário por ID", description = "Retorna os detalhes de um usuário específico")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
@@ -47,7 +48,7 @@ public class UserController {
     }
 
     @GetMapping("/email/{email}")
-    @Operation(summary = "Buscar usuário por email", description = "Retorna os dados de um usuário pelo email")
+    @Operation(summary = "Buscar usuário por email", description = "Retorna os detalhes de um usuário pelo email")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
@@ -58,13 +59,14 @@ public class UserController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar todos os usuários", description = "Retorna a lista de todos os usuários cadastrados")
+    @Operation(summary = "Listar todos os usuários", description = "Retorna uma lista de todos os usuários cadastrados")
     @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso")
     public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
         List<UserResponseDTO> users = userService.getAllUsers();
         return ResponseEntity.ok(users);
     }
 
+    // --- CORREÇÃO AQUI ---
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar usuário", description = "Atualiza os dados de um usuário existente")
     @ApiResponses(value = {
@@ -75,10 +77,11 @@ public class UserController {
     })
     public ResponseEntity<UserResponseDTO> updateUser(
             @PathVariable Long id,
-            @Valid @RequestBody UserCreateDTO dto) {
+            @Valid @RequestBody UserUpdateDTO dto) { // <--- Usa UserUpdateDTO
         UserResponseDTO user = userService.updateUser(id, dto);
         return ResponseEntity.ok(user);
     }
+    // ---------------------
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Deletar usuário", description = "Remove um usuário do sistema")
