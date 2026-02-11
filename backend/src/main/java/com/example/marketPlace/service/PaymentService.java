@@ -36,8 +36,6 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final PaymentProducer paymentProducer;
 
-    // --- Métodos de Criação (Mantidos iguais) ---
-
     @Transactional
     public PaymentResponseDTO processPayment(PaymentRequestDTO request) {
         return createPaymentIntegration(request, request.paymentMethodId());
@@ -48,23 +46,19 @@ public class PaymentService {
         return createPaymentIntegration(request, "pix");
     }
 
-    // Lógica unificada de criação para evitar duplicação
     private PaymentResponseDTO createPaymentIntegration(PaymentRequestDTO request, String methodId) {
-        // Validação de idempotency key
+
         if (request.idempotencyKey() == null) {
             throw new PaymentException("Chave de idempotência é obrigatória");
         }
 
-        // Validação de idempotência
         if (paymentRepository.existsByIdempotencyKey(request.idempotencyKey().toString())) {
             throw new PaymentException("Transação já processada (Idempotência).");
         }
 
-        // Busca o pedido
         Order order = orderRepository.findById(request.orderId())
                 .orElseThrow(() -> new PaymentException("Pedido não encontrado com ID: " + request.orderId()));
 
-        // Validação do total do pedido
         if (order.getTotal() == null || order.getTotal().compareTo(BigDecimal.ZERO) <= 0) {
             throw new PaymentException("Valor do pedido inválido");
         }
@@ -76,9 +70,9 @@ public class PaymentService {
                     .transactionAmount(order.getTotal())
                     .description("Pagamento Pedido #" + order.getOrderId())
                     .paymentMethodId(methodId)
+                    .externalReference(order.getOrderId().toString())
                     .payer(PaymentPayerRequest.builder().email(request.email()).build());
 
-            // Para pagamentos que não são Pix, requer token e installments
             if (!"pix".equals(methodId) && !"bolbradesco".equals(methodId)) {
                 if (request.token() == null || request.token().isBlank()) {
                     throw new PaymentException("Token do cartão é obrigatório");
@@ -97,7 +91,6 @@ public class PaymentService {
             return saveAndMapPayment(mpPayment, order, request.idempotencyKey().toString());
 
         } catch (PaymentException e) {
-            // Re-lança exceções de negócio
             throw e;
         } catch (MPApiException e) {
             log.error("Erro Mercado Pago API: Status={}, Message={}", e.getStatusCode(), e.getMessage(), e);
@@ -111,8 +104,6 @@ public class PaymentService {
         }
     }
 
-    // --- Lógica de Atualização (Webhook & Fallback) ---
-
     @Transactional
     public void processWebhook(String topic, String id) {
         if (!"payment".equals(topic)) return;
@@ -124,7 +115,6 @@ public class PaymentService {
             // Busca o pagamento no nosso banco
             Payment localPayment = paymentRepository.findByTransactionId(id).orElse(null);
 
-            // Chama o método centralizado de atualização
             if (localPayment != null) {
                 updateLocalPaymentStatus(localPayment, mpPayment.getStatus());
             }
@@ -133,12 +123,8 @@ public class PaymentService {
         }
     }
 
-    /**
-     * NOVO: Método chamado pelo Cron Job para verificar pendências
-     */
     @Transactional
     public void reconcilePendingPayments() {
-        // Busca pagamentos PENDING criados há mais de 5 minutos
         LocalDateTime cutOffTime = LocalDateTime.now().minusMinutes(5);
         List<Payment> pendingPayments = paymentRepository.findByStatusAndPaymentDateBefore(PaymentStatus.PENDING, cutOffTime);
 
@@ -149,10 +135,8 @@ public class PaymentService {
 
         for (Payment payment : pendingPayments) {
             try {
-                // Consulta manual na API do Mercado Pago
                 com.mercadopago.resources.payment.Payment mpPayment = client.get(Long.parseLong(payment.getTransactionId()));
 
-                // Tenta atualizar
                 boolean changed = updateLocalPaymentStatus(payment, mpPayment.getStatus());
                 if (changed) {
                     log.info("Reconciliador: Pagamento {} recuperado! Novo status: {}", payment.getTransactionId(), mpPayment.getStatus());
@@ -163,10 +147,6 @@ public class PaymentService {
         }
     }
 
-    /**
-     * Lógica Centralizada de Aprovação.
-     * Retorna true se houve mudança de status.
-     */
     private boolean updateLocalPaymentStatus(Payment payment, String mpStatusRaw) {
         PaymentStatus newStatus = mapMercadoPagoStatus(mpStatusRaw);
 
@@ -175,11 +155,13 @@ public class PaymentService {
             payment.setStatus(newStatus);
             paymentRepository.save(payment);
 
-            // Se aprovado, dispara Mensageria (E-mail, WebSocket, etc)
             if (newStatus == PaymentStatus.COMPLETED) {
+
+                String userEmail = payment.getOrder().getBuyer().getEmail();
+
                 PaymentEventDTO event = new PaymentEventDTO(
                         payment.getOrder().getOrderId(),
-                        "cliente@email.com", // Ajustar para pegar do user real
+                        userEmail,
                         payment.getAmount(),
                         newStatus.toString(),
                         payment.getTransactionId()
@@ -197,7 +179,6 @@ public class PaymentService {
         return mapToResponse(payment, null, null);
     }
 
-    // --- Mappers e Auxiliares (Iguais) ---
     private PaymentResponseDTO saveAndMapPayment(com.mercadopago.resources.payment.Payment mpPayment, Order order, String idempotencyKey) {
         Payment payment = new Payment();
         payment.setAmount(mpPayment.getTransactionAmount());
@@ -207,7 +188,23 @@ public class PaymentService {
         payment.setTransactionId(mpPayment.getId().toString());
         payment.setIdempotencyKey(idempotencyKey);
         payment.setOrder(order);
+
         paymentRepository.save(payment);
+
+        if (payment.getStatus() == PaymentStatus.COMPLETED) {
+            log.info("Pagamento aprovado imediatamente. Disparando evento de confirmação.");
+
+            String userEmail = order.getBuyer().getEmail();
+
+            PaymentEventDTO event = new PaymentEventDTO(
+                    order.getOrderId(),
+                    userEmail,
+                    payment.getAmount(),
+                    payment.getStatus().toString(),
+                    payment.getTransactionId()
+            );
+            paymentProducer.sendPaymentSuccess(event);
+        }
 
         String qrCode = null;
         String qrCodeBase64 = null;

@@ -12,7 +12,6 @@ import java.math.BigDecimal;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-
 @Entity
 @Table(name = "products")
 public class Product {
@@ -44,6 +43,18 @@ public class Product {
     @Column(length = 500)
     private String image;
 
-    public void setSelelr(User admin) {
-    }
+    @Column(nullable = false)
+    private Double weight;
+
+    @Column(nullable = false)
+    private Integer height;
+
+    @Column(nullable = false)
+    private Integer width;
+
+    @Column(nullable = false)
+    private Integer length;
+
+    @Version
+    private Long version;
 }

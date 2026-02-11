@@ -1,4 +1,3 @@
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -27,11 +26,17 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_PROFILES_ACTIVE=dev
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/marketplace
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=admin123
-      - MERCADO_PAGO_ACCESS_TOKEN=TEST-0000000000000000-000000-00000000000000000000000000000000-00000000
+      # --- CORREÇÕES ABAIXO ---
+      # Força o uso do Driver do PostgreSQL (sobrescreve o padrão H2 do application.properties)
+      - SPRING_DATASOURCE_DRIVER=org.postgresql.Driver
+      # Força o dialeto correto para evitar erros de SQL
+      - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.PostgreSQLDialect
+      # ------------------------
+      - MERCADO_PAGO_ACCESS_TOKEN=TEST-115918252371439-011820-13972a58589b65487bd392512e69e996-1171424632
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
       - RABBITMQ_USERNAME=user
@@ -62,17 +67,19 @@ services:
     image: rabbitmq:3.12-management
     container_name: marketplace-rabbitmq
     ports:
-      - "5672:5672"   # Porta padrão de comunicação
-      - "15672:15672" # Painel de administração (Web UI)
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: user
       RABBITMQ_DEFAULT_PASS: password
     networks:
       - marketplace-network
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 volumes:
   postgres-data:
+  rabbitmq_data:
 
 networks:
   marketplace-network:
     driver: bridge
-

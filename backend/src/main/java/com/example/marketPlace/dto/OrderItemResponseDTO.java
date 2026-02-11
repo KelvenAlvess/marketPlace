@@ -8,6 +8,7 @@ public record OrderItemResponseDTO(
         Long orderItemId,
         Long productId,
         String productName,
+        String image,
         Integer quantity,
         BigDecimal priceAtTheTime,
         BigDecimal subtotal
@@ -20,6 +21,7 @@ public record OrderItemResponseDTO(
                 orderItem.getOrderItemId(),
                 orderItem.getProduct().getProductId(),
                 orderItem.getProduct().getProductName(),
+                orderItem.getProduct().getImage(),
                 orderItem.getQuantity(),
                 orderItem.getUnitPrice(),
                 subtotal

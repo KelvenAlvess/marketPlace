@@ -6,7 +6,6 @@ import com.example.marketPlace.model.enums.OrderStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public record OrderResponseDTO(
         Long orderId,
@@ -16,13 +15,19 @@ public record OrderResponseDTO(
         LocalDateTime orderDate,
         OrderStatus status,
         List<OrderItemResponseDTO> items,
+        BigDecimal shippingCost,
         BigDecimal totalAmount,
         Integer totalItems
 ) {
     public static OrderResponseDTO from(Order order, List<OrderItemResponseDTO> items) {
-        BigDecimal totalAmount = items.stream()
+
+        BigDecimal itemsSubtotal = items.stream()
                 .map(OrderItemResponseDTO::subtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal shipping = order.getShippingCost() != null ? order.getShippingCost() : BigDecimal.ZERO;
+
+        BigDecimal totalAmount = itemsSubtotal.add(shipping);
 
         Integer totalItems = items.stream()
                 .map(OrderItemResponseDTO::quantity)
@@ -36,9 +41,9 @@ public record OrderResponseDTO(
                 order.getOrderDate(),
                 order.getStatus(),
                 items,
-                totalAmount,
+                shipping,    // Passando o frete
+                totalAmount, // Passando o total corrigido
                 totalItems
         );
     }
 }
-
