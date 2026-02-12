@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import productService from '../service/productService';
+import { useCart } from '../context/CartContext';
 
 function Home() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { addToCart } = useCart();
+  const [addingId, setAddingId] = useState(null); // Controla loading individual dos botões
 
   useEffect(() => {
     loadFeaturedProducts();
@@ -13,7 +16,6 @@ function Home() {
   const loadFeaturedProducts = async () => {
     try {
       const data = await productService.getAllProducts();
-      // Pega os 8 primeiros
       setProducts(data.slice(0, 8));
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
@@ -22,29 +24,42 @@ function Home() {
     }
   };
 
-  // --- NOVA LÓGICA DE IMAGENS ---
-  // Mapa de imagens genéricas por categoria para não ficar tudo igual
+  const handleAddToCart = async (e, product) => {
+    e.preventDefault(); // Garante que não navegue se estiver dentro de um Link (segurança)
+    e.stopPropagation();
+
+    const pId = product.productId || product.product_ID;
+    setAddingId(pId);
+
+    try {
+      // Adiciona ao carrinho com um pequeno delay visual para feedback
+      await Promise.all([
+        addToCart(pId, 1),
+        new Promise(resolve => setTimeout(resolve, 500))
+      ]);
+    } catch (err) {
+      console.error("Erro ao adicionar ao carrinho", err);
+    } finally {
+      setAddingId(null);
+    }
+  };
+
   const getFallbackImage = (categoryName) => {
     const fallbackMap = {
-      'Eletrônicos': 'https://images.unsplash.com/photo-1498049860654-af1a5c5668ba?auto=format&fit=crop&w=500&q=80', // Tech/Laptop
-      'Roupas': 'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=500&q=80', // Casaco
-      'Calçados': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80', // Tênis vermelho
-      'Livros': 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=500&q=80', // Livros
-      'Casa': 'https://images.unsplash.com/photo-1484154218962-a1c00207099b?auto=format&fit=crop&w=500&q=80', // Cozinha
-      'Gamer': 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=500&q=80', // Setup Gamer
+      'Eletrônicos': 'https://images.unsplash.com/photo-1498049860654-af1a5c5668ba?auto=format&fit=crop&w=500&q=80',
+      'Roupas': 'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=500&q=80',
+      'Calçados': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80',
+      'Livros': 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=500&q=80',
+      'Casa': 'https://images.unsplash.com/photo-1484154218962-a1c00207099b?auto=format&fit=crop&w=500&q=80',
+      'Gamer': 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=500&q=80',
     };
-
-    // Se a categoria bater com o mapa, usa ela.
-    // Se não, usa uma imagem neutra de "Sacola de Compras" (nada de Pepsi!)
     return fallbackMap[categoryName] || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=500&q=80';
   };
 
   const resolveImage = (product) => {
-    // 1. Se o produto tem imagem real (começa com http), usa ela
     if (product.image && product.image.startsWith('http')) {
       return product.image;
     }
-    // 2. Se não tem, pega uma baseada na categoria
     return getFallbackImage(product.category?.name);
   };
 
@@ -155,45 +170,50 @@ function Home() {
             {products.map((product) => {
               const displayImage = resolveImage(product);
               const categoryName = product.category?.name || 'Geral';
+              const pId = product.productId || product.product_ID;
+              const isAdding = addingId === pId;
 
               return (
                   <div
-                      key={product.product_ID}
+                      key={pId}
                       className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 transition-all duration-300 flex flex-col overflow-hidden"
                   >
-                    {/* Image Container */}
-                    <div className="relative h-72 overflow-hidden bg-gray-100">
+                    {/* Image Container - Link para detalhes */}
+                    <Link to={`/product/${pId}`} className="relative h-72 overflow-hidden bg-gray-100 block cursor-pointer">
                       <img
                           src={displayImage}
                           alt={product.productName}
                           className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-in-out"
                           onError={(e) => {
-                            // Se a imagem falhar, coloca uma sacola neutra (SEM PEPSI!)
                             e.target.src = 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=500&q=80';
                           }}
                       />
 
                       {/* Category Badge */}
                       <span className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
-                    {categoryName}
-                  </span>
+                        {categoryName}
+                      </span>
 
                       {/* Badges de Estoque */}
                       {product.stockQuantity < 5 && (
                           <span className="absolute top-4 right-4 bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md animate-pulse">
-                      Últimos
-                    </span>
+                            Últimos
+                          </span>
                       )}
 
                       {/* Hover Overlay */}
                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    </div>
+                    </Link>
 
                     {/* Content */}
                     <div className="p-6 flex flex-col flex-grow relative">
-                      <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-1 group-hover:text-red-600 transition-colors">
-                        {product.productName}
-                      </h3>
+                      {/* Título - Link para detalhes */}
+                      <Link to={`/product/${pId}`} className="block">
+                        <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-1 group-hover:text-red-600 transition-colors">
+                          {product.productName}
+                        </h3>
+                      </Link>
+
                       <p className="text-gray-500 text-sm line-clamp-2 mb-6 flex-grow leading-relaxed">
                         {product.description}
                       </p>
@@ -202,13 +222,28 @@ function Home() {
                         <div className="flex flex-col">
                           <span className="text-xs text-gray-400 font-medium line-through mb-0.5">R$ {(product.productPrice * 1.25).toFixed(2)}</span>
                           <span className="text-2xl font-extrabold text-gray-900 tracking-tight">
-                        R$ {Number(product.productPrice).toFixed(2)}
-                      </span>
+                            R$ {Number(product.productPrice).toFixed(2)}
+                          </span>
                         </div>
 
-                        <Link to={`/products`} className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm group-hover:scale-110">
-                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                        </Link>
+                        {/* Botão de Adicionar ao Carrinho */}
+                        <button
+                            onClick={(e) => handleAddToCart(e, product)}
+                            disabled={isAdding || product.stockQuantity === 0}
+                            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-sm group-hover:scale-110 
+                              ${product.stockQuantity === 0
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                : 'bg-red-50 text-red-600 hover:bg-red-600 hover:text-white cursor-pointer'}`}
+                        >
+                          {isAdding ? (
+                              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                          ) : (
+                              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -225,7 +260,6 @@ function Home() {
 
         {/* === NEWSLETTER === */}
         <div className="bg-gray-900 py-20 relative overflow-hidden">
-          {/* Efeito de fundo */}
           <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-red-600 rounded-full blur-3xl opacity-10"></div>
           <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-orange-600 rounded-full blur-3xl opacity-10"></div>
 

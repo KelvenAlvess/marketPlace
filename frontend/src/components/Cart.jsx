@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // Hook de navegação
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import orderService from '../service/orderService.js';
 
 function Cart({ isOpen, onClose }) {
-  const { cartItems, removeFromCart, updateQuantity, loadCart } = useCart();
+  const { cartItems, removeFromCart, updateQuantity } = useCart(); // Removi loadCart daqui pois não vamos usar no finalize
   const { user } = useAuth();
-  const navigate = useNavigate(); // Instância do navegador
+  const navigate = useNavigate();
 
   const [removingItems, setRemovingItems] = useState(new Set());
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
@@ -40,10 +40,14 @@ function Cart({ isOpen, onClose }) {
     return cartItems.reduce((total, item) => total + (item.subtotal || 0), 0);
   };
 
-  // Lógica alterada: Cria pedido -> Redireciona para página dedicada
   const handleFinalizeOrder = async () => {
     if (!user) {
       alert("Faça login para finalizar a compra.");
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      alert("Seu carrinho está vazio.");
       return;
     }
 
@@ -51,17 +55,16 @@ function Cart({ isOpen, onClose }) {
       setIsCreatingOrder(true);
 
       const userId = user.userId || user.user_ID || user.id;
-      // 1. Cria o pedido no Backend
-      const orderData = await orderService.createOrder({ userId });
 
-      // 2. Atualiza o carrinho local (que agora estará vazio)
-      await loadCart();
+      const orderData = await orderService.createOrder(userId);
 
-      // 3. Fecha a sidebar do carrinho
       onClose();
 
-      // 4. Redireciona para a nova página de Checkout com o ID do pedido
-      navigate(`/checkout/${orderData.orderId}`);
+      if (orderData && orderData.orderId) {
+        navigate(`/checkout/${orderData.orderId}`);
+      } else {
+        throw new Error("Resposta do pedido inválida");
+      }
 
     } catch (error) {
       console.error("Erro ao criar pedido:", error);
@@ -88,8 +91,6 @@ function Cart({ isOpen, onClose }) {
                 </svg>
               </button>
             </div>
-
-            {/* Body */}
             <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
               {cartItems.length === 0 ? (
                   <div className="text-center text-gray-500 mt-10">
@@ -98,12 +99,15 @@ function Cart({ isOpen, onClose }) {
               ) : (
                   <div className="space-y-4">
                     {cartItems.map((item) => (
-                        <div key={item.cartItem_ID} className="flex gap-4 py-4 border-b border-gray-100 animate-fadeIn">
+                        <div key={item.cartItemId || item.id} className="flex gap-4 py-4 border-b border-gray-100 animate-fadeIn">
                           <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                             <img
-                                src={item.productImage || 'https://via.placeholder.com/150'}
+                                src={item.productImage}
                                 alt={item.productName}
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.src = 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=150&q=80';
+                                }}
                             />
                           </div>
 
@@ -117,16 +121,16 @@ function Cart({ isOpen, onClose }) {
                               <div className="flex items-center border border-gray-300 rounded-md">
                                 <button
                                     className="px-2 py-1 text-gray-600 hover:bg-gray-100"
-                                    onClick={() => handleQuantityChange(item.cartItem_ID, item.quantity - 1)}
+                                    onClick={() => handleQuantityChange(item.cartItem_ID || item.cartItemId, item.quantity - 1)}
                                 >
                                   -
                                 </button>
                                 <span className="px-2 py-1 text-gray-900 min-w-[2rem] text-center">
-                            {item.quantity}
-                          </span>
+                                  {item.quantity}
+                                </span>
                                 <button
                                     className="px-2 py-1 text-gray-600 hover:bg-gray-100"
-                                    onClick={() => handleQuantityChange(item.cartItem_ID, item.quantity + 1)}
+                                    onClick={() => handleQuantityChange(item.cartItem_ID || item.cartItemId, item.quantity + 1)}
                                 >
                                   +
                                 </button>
@@ -134,7 +138,7 @@ function Cart({ isOpen, onClose }) {
 
                               <button
                                   className={`text-sm font-medium text-red-600 hover:text-red-500 ${removingItems.has(item.cartItem_ID) ? 'opacity-50 cursor-wait' : ''}`}
-                                  onClick={() => handleRemoveItem(item.cartItem_ID)}
+                                  onClick={() => handleRemoveItem(item.cartItem_ID || item.cartItemId)}
                                   disabled={removingItems.has(item.cartItem_ID)}
                               >
                                 {removingItems.has(item.cartItem_ID) ? 'Removendo...' : 'Remover'}
@@ -143,9 +147,9 @@ function Cart({ isOpen, onClose }) {
                           </div>
 
                           <div className="text-right">
-                      <span className="font-bold text-gray-800">
-                        R$ {item.subtotal?.toFixed(2)}
-                      </span>
+                            <span className="font-bold text-gray-800">
+                              R$ {item.subtotal?.toFixed(2)}
+                            </span>
                           </div>
                         </div>
                     ))}
@@ -153,7 +157,6 @@ function Cart({ isOpen, onClose }) {
               )}
             </div>
 
-            {/* Footer */}
             {user && cartItems.length > 0 && (
                 <div className="border-t border-gray-200 p-6 bg-gray-50">
                   <div className="flex justify-between items-center mb-4">
