@@ -1,15 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import ProductDetails from './pages/ProductDetails';
 
-// Componentes
 import Navbar from './components/Navbar';
 import Home from './components/Home';
 import Login from './components/Login';
 import Register from './components/Register';
 import Checkout from './components/Checkout';
-
-// Páginas
 import Products from './pages/Products';
 import Categories from './pages/Categories';
 import CategoryProducts from './pages/CategoryProducts';
@@ -26,23 +24,20 @@ function App() {
 
               <div className="flex-grow">
                 <Routes>
-                  {/* Rota Principal */}
                   <Route path="/" element={<Home />} />
 
-                  {/* Autenticação (AS ROTAS QUE FALTAVAM) */}
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
 
-                  {/* Produtos e Categorias */}
                   <Route path="/products" element={<Products />} />
                   <Route path="/categories" element={<Categories />} />
                   <Route path="/categories/:categoryId" element={<CategoryProducts />} />
 
-                  {/* Checkout e Pagamento */}
                   <Route path="/checkout/:orderId" element={<Checkout />} />
 
-                  {/* Rota Coringa (Opcional: redireciona erro 404 para Home) */}
                   <Route path="*" element={<Navigate to="/" replace />} />
+
+                  <Route path="/product/:id" element={<ProductDetails />} />
                 </Routes>
               </div>
             </div>

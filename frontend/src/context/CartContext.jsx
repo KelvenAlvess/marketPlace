@@ -5,44 +5,45 @@ import { useAuth } from './AuthContext';
 const CartContext = createContext();
 
 export function CartProvider({ children }) {
-  const [cartItems, setCartItems] = useState([]);
-  const [cartCount, setCartCount] = useState(0);
   const { user } = useAuth();
 
-  // CORREÇÃO 1: loadCart agora é PURAMENTE para buscar dados.
-  // Removemos a lógica de "else { setCartItems([]) }" daqui de dentro.
-  // Se não tem user, ela retorna void sem disparar nenhum setState.
+  const [cartItems, setCartItems] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem('marketplace_cart');
+      return savedCart ? JSON.parse(savedCart) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [cartCount, setCartCount] = useState(() => {
+    return cartItems.reduce((total, item) => total + (Number(item.quantity) || 0), 0);
+  });
+
+  useEffect(() => {
+    localStorage.setItem('marketplace_cart', JSON.stringify(cartItems));
+
+    const count = cartItems.reduce((total, item) => total + (Number(item.quantity) || 0), 0);
+    setCartCount(count);
+  }, [cartItems]);
+
   const loadCart = useCallback(async () => {
     const userId = user?.id || user?.user_ID || user?.userId;
-    
-    // Se não tem usuário, PARE. Não limpe o estado aqui.
+
     if (!userId) return;
-    
+
     try {
       const items = await cartService.getCartItems(userId);
       setCartItems(items);
-      setCartCount(items.reduce((total, item) => total + (Number(item.quantity) || 0), 0));
     } catch (error) {
       console.error('Erro ao carregar carrinho:', error);
       // Não fazer nada em caso de erro para não quebrar a aplicação
     }
   }, [user]);
 
-  // CORREÇÃO 2: O useEffect gerencia o ciclo de vida (Login vs Logout)
   useEffect(() => {
-    const userId = user?.id || user?.user_ID || user?.userId;
-
-    if (userId) {
-      // Se tem usuário, chama a função Async (permitido)
-      loadCart();
-    } else {
-      // Se NÃO tem usuário (Logout ou Load inicial), limpamos o estado AQUI.
-      // Usamos a checagem 'prev.length > 0' para garantir que o React
-      // ignore essa atualização se o carrinho já estiver vazio.
-      setCartItems(prev => (prev.length > 0 ? [] : prev));
-      setCartCount(prev => (prev > 0 ? 0 : prev));
-    }
-  }, [user, loadCart]);
+    loadCart();
+  }, [loadCart]);
 
   const addToCart = async (productId, quantity = 1) => {
     const userId = user?.id || user?.user_ID || user?.userId;
@@ -58,6 +59,7 @@ export function CartProvider({ children }) {
         productId: productId,
         quantity: quantity
       });
+
       await loadCart();
       return true;
     } catch (error) {
@@ -69,10 +71,13 @@ export function CartProvider({ children }) {
 
   const removeFromCart = async (itemId) => {
     try {
+      setCartItems(prev => prev.filter(item => (item.cartItemId || item.id) !== itemId));
+
       await cartService.removeItem(itemId);
-      await loadCart();
+      await loadCart(); // Confirma com o backend
     } catch (error) {
       console.error('Erro ao remover do carrinho:', error);
+      loadCart();
       throw error;
     }
   };
