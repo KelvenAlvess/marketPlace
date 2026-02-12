@@ -1,14 +1,21 @@
 import api from './api';
 
 const orderService = {
-    // Busca um pedido específico (usado no Checkout)
+
+    // Busca um pedido pelo ID
     getOrderById: async (orderId) => {
         const response = await api.get(`/orders/${orderId}`);
         return response.data;
     },
 
-    // === CORREÇÃO FINAL ===
-    // O Backend espera POST em "/orders" com um JSON { "userId": 123 }
+    createOrder: async (userId) => {
+
+        const payload = { userId: userId };
+        const response = await api.post('/orders', payload);
+        return response.data;
+    },
+
+    // Mantido para compatibilidade
     createOrderFromCart: async (userId) => {
         const payload = { userId: userId };
         const response = await api.post('/orders', payload);
