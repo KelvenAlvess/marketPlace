@@ -74,6 +74,9 @@ function Home() {
     );
   }
 
+  const featuredProducts = products.slice(0, 4);
+  const displayProducts = selectedFilter === 'featured' ? featuredProducts : products;
+
   return (
       <div className="min-h-screen bg-gray-50 font-sans">
 

@@ -8,8 +8,8 @@ const cartService = {
   },
 
   // Atualizar quantidade de item
-  updateItemQuantity: async (id, quantity) => {
-    const response = await api.put(`/cart-items/${id}`, { quantity });
+  updateQuantity: async (id, quantity) => {
+    const response = await api.put(`/cart-items/${id}/quantity`, { quantity });
     return response.data;
   },
 
@@ -22,6 +22,11 @@ const cartService = {
   getCartItems: async (userId) => {
     const response = await api.get(`/cart-items/user/${userId}`);
     return response.data;
+  },
+
+  // Limpar carrinho do usuário
+  clearCart: async (userId) => {
+    await api.delete(`/cart-items/user/${userId}`);
   }
 };
 

@@ -61,17 +61,22 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         String username = null;
         String jwtToken = null;
 
+        log.info("🔍 Requisição: {} {} - Auth Header: {}", method, path, requestTokenHeader != null ? "Presente" : "Ausente");
+
         if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
             jwtToken = requestTokenHeader.substring(7);
             try {
                 username = jwtTokenUtil.extractUsername(jwtToken);
+                log.info("✅ Token JWT válido - Usuário: {}", username);
             } catch (IllegalArgumentException e) {
-                log.error("Não foi possível obter o token JWT");
+                log.error("❌ Não foi possível obter o token JWT");
             } catch (ExpiredJwtException e) {
                 log.warn("Token JWT expirado");
             } catch (Exception e) {
                 log.error("Erro ao processar token JWT", e);
             }
+        } else {
+            log.warn("⚠️ Nenhum token Bearer encontrado no header Authorization");
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
