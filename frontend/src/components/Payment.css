@@ -1,0 +1,20 @@
+/* src/components/Payment.css */
+
+.mp-payment-container {
+    /* Garante altura mínima para o formulário não ficar "achatado" */
+    min-height: 500px;
+
+    /* Garante que o conteúdo não seja cortado */
+    overflow: visible !important;
+
+    /* Garante fundo branco e contraste correto */
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    width: 100%;
+}
+
+/* Força a cor do texto dos inputs do Mercado Pago (caso estejam brancos no fundo branco) */
+.svelte-1q9a6p {
+    color: #333 !important;
+}
