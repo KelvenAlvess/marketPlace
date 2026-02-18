@@ -63,26 +63,4 @@ Um sistema de E-commerce/Marketplace Fullstack de alto desempenho, focado em esc
 Crie um arquivo `.env` na raiz do projeto com as seguintes chaves (exemplo):
 
 ```properties
-# Banco de Dados
-DB_NAME=marketplace
-DB_USER=postgres
-DB_PASSWORD=password
 
-# JWT
-JWT_SECRET=sua_chave_secreta_super_segura_base64
-JWT_EXPIRATION=86400000
-
-# RabbitMQ
-RABBITMQ_USER=guest
-RABBITMQ_PASS=guest
-
-# Mercado Pago (Credenciais de Teste/Prod)
-MP_ACCESS_TOKEN=TEST-seu-access-token
-MP_WEBHOOK_SECRET=sua-chave-webhook-secret-key
-
-# Frontend
-VITE_API_URL=http://localhost:8081/api
-VITE_MP_PUBLIC_KEY=TEST-sua-public-key
-
-# CORS
-CORS_ALLOWED_ORIGINS=http://localhost:3000
