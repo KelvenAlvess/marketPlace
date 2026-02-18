@@ -1,10 +1,13 @@
 package com.example.marketPlace.model;
 
+import com.example.marketPlace.model.enums.PaymentMethod;
+import com.example.marketPlace.model.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -34,17 +37,19 @@ public class Payment {
     @Column(nullable = false)
     private PaymentStatus status;
 
+    @Column(unique = true) // Garante unicidade no nível do banco
     private String transactionId;
 
+    @Column(unique = true, updatable = false) // Segurança contra dupla cobrança
+    private String idempotencyKey;
+
+    @OneToOne
+    @JoinColumn(name = "order_id")
+    private Order order;
+
+    // Removido Invoice para simplificar este exemplo,
+    // ou mantenha se sua lógica de negócio exigir
     @OneToOne
     @JoinColumn(name = "invoice_id")
     private Invoice invoice;
-
-    public enum PaymentMethod {
-        CREDIT_CARD, DEBIT_CARD, PIX, BANK_TRANSFER, CASH
-    }
-
-    public enum PaymentStatus {
-        PENDING, COMPLETED, FAILED, REFUNDED
-    }
 }

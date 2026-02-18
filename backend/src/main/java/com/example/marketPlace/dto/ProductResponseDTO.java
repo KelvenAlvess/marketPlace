@@ -15,18 +15,20 @@ public record ProductResponseDTO(
         BigDecimal productPrice,
         Category category,
         User seller,
-        Integer stockQuantity
+        Integer stockQuantity,
+        String imageUrl
 
 ) {
     public static ProductResponseDTO from(Product product) {
         return new ProductResponseDTO(
-                product.getProduct_ID(),
+                product.getProductId(),
                 product.getProductName(),
                 product.getDescription(),
                 product.getProductPrice(),
                 product.getCategory(),
                 product.getSeller(),
-                product.getStockQuantity()
+                product.getStockQuantity(),
+                product.getImageUrl()
         );
     }
 }

@@ -1,7 +1,7 @@
 package com.example.marketPlace.model.enums;
 
 public enum PaymentMethod {
-    CREIDIT_CARD("Credit Card"),
+    CREDIT_CARD("Credit Card"),
     DEBIT_CARD("Debit Card"),
     PIX("Pix"),
     CASH("Cash"),

@@ -12,14 +12,13 @@ import java.math.BigDecimal;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-
 @Entity
 @Table(name = "products")
 public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long product_ID;
+    private Long productId;
 
     @Column(nullable = false, length = 150)
     private String productName;
@@ -40,4 +39,22 @@ public class Product {
 
     @Column(nullable = false)
     private Integer stockQuantity;
+
+    @Column(length = 500)
+    private String image;
+
+    @Column(nullable = false)
+    private Double weight;
+
+    @Column(nullable = false)
+    private Integer height;
+
+    @Column(nullable = false)
+    private Integer width;
+
+    @Column(nullable = false)
+    private Integer length;
+
+    @Version
+    private Long version;
 }

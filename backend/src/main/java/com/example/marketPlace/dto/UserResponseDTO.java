@@ -21,8 +21,8 @@ public record UserResponseDTO(
 ) {
     public static UserResponseDTO from(User user) {
         return new UserResponseDTO(
-                user.getUser_ID(),
-                user.getUserName(),
+                user.getUserId(),
+                user.getUsername(),
                 user.getEmail(),
                 user.getCpf(),
                 user.getPhoneNumber(),

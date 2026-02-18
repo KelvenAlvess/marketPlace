@@ -39,7 +39,7 @@ public class ProductService {
         Product product = dto.toEntity(category, seller);
         Product savedProduct = productRepository.save(product);
 
-        log.info("Produto criado com sucesso. ID: {}", savedProduct.getProduct_ID());
+        log.info("Produto criado com sucesso. ID: {}", savedProduct.getProductId());
         return ProductResponseDTO.from(savedProduct);
     }
 
@@ -110,7 +110,7 @@ public class ProductService {
         product.setStockQuantity(dto.stockQuantity());
 
         Product updatedProduct = productRepository.save(product);
-        log.info("Produto atualizado com sucesso. ID: {}", updatedProduct.getProduct_ID());
+        log.info("Produto atualizado com sucesso. ID: {}", updatedProduct.getProductId());
 
         return ProductResponseDTO.from(updatedProduct);
     }
