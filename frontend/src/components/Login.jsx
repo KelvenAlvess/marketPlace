@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // Usamos Link e useNavigate agora
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function Login() {
@@ -18,18 +18,15 @@ function Login() {
     setError('');
     setLoading(true);
 
-    // O login geralmente retorna um objeto ou lança erro.
-    // Ajuste conforme seu AuthContext.
-    // Assumindo que seu login retorna { success: true/false, error: string }
     try {
       const result = await login(loginData.email, loginData.password);
 
-      // Se o seu context não retorna objeto e apenas lança erro no falha,
-      // o 'await' passará direto e você pode navegar.
+      // Se o login falhar, exibe o erro
       if (result && result.success === false) {
         setError(result.error || 'Falha ao entrar');
       } else {
-        navigate('/'); // Redireciona para Home no sucesso
+        // Se der certo, vai para a Home
+        navigate('/');
       }
     } catch (err) {
       console.error(err);
@@ -78,45 +75,6 @@ function Login() {
                     className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
                     placeholder="seu@email.com"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Conta
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={registerData.roles.includes('BUYER')}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setRegisterData({ ...registerData, roles: [...registerData.roles, 'BUYER'] });
-                        } else {
-                          setRegisterData({ ...registerData, roles: registerData.roles.filter(r => r !== 'BUYER') });
-                        }
-                      }}
-                      className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Comprador - Comprar produtos</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={registerData.roles.includes('SELLER')}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setRegisterData({ ...registerData, roles: [...registerData.roles, 'SELLER'] });
-                        } else {
-                          setRegisterData({ ...registerData, roles: registerData.roles.filter(r => r !== 'SELLER') });
-                        }
-                      }}
-                      className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Vendedor - Vender produtos</span>
-                  </label>
-                </div>
-                <p className="mt-1 text-xs text-gray-500">Selecione pelo menos uma opção</p>
               </div>
 
               <div>
