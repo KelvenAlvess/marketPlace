@@ -25,7 +25,7 @@ public record ProductCreateDTO(
         product.setProductPrice(this.price);
         product.setSeller(seller);
         product.setStockQuantity(this.stockQuantity);
-        product.setImageUrl(this.imageUrl);
+        product.setImage(this.imageUrl);
         return product;
     }
 }

@@ -28,7 +28,7 @@ public record ProductResponseDTO(
                 product.getCategory(),
                 product.getSeller(),
                 product.getStockQuantity(),
-                product.getImageUrl()
+                product.getImage()
         );
     }
 }
