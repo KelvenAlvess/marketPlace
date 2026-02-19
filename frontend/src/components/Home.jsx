@@ -7,7 +7,8 @@ function Home() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
-  const [addingId, setAddingId] = useState(null); // Controla loading individual dos botões
+  const [addingId, setAddingId] = useState(null);
+  const [selectedFilter, setSelectedFilter] = useState('all');// Controla loading individual dos botões
 
   useEffect(() => {
     loadFeaturedProducts();
