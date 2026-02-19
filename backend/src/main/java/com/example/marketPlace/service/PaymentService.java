@@ -35,7 +35,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class PaymentService {
 
-    @Value("${mercadopago.webhook.secret}")
+    @Value("${MP_WEBHOOK_SECRET}")
     private String webhookSecret;
 
     private final PaymentRepository paymentRepository;
