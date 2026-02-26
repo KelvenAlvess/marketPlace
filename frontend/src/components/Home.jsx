@@ -2,13 +2,19 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import productService from '../service/productService';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext'; // Importação do contexto
+import AddProduct from './AddProduct'; // Ajuste o caminho se o componente estiver em outra pasta
 
 function Home() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
   const [addingId, setAddingId] = useState(null);
-  const [selectedFilter, setSelectedFilter] = useState('all');// Controla loading individual dos botões
+  const [selectedFilter, setSelectedFilter] = useState('all');
+
+  // Novos estados e hooks para o modal de produto e verificação de role
+  const { hasRole } = useAuth();
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
     loadFeaturedProducts();
@@ -26,14 +32,13 @@ function Home() {
   };
 
   const handleAddToCart = async (e, product) => {
-    e.preventDefault(); // Garante que não navegue se estiver dentro de um Link (segurança)
+    e.preventDefault();
     e.stopPropagation();
 
     const pId = product.productId || product.product_ID;
     setAddingId(pId);
 
     try {
-      // Adiciona ao carrinho com um pequeno delay visual para feedback
       await Promise.all([
         addToCart(pId, 1),
         new Promise(resolve => setTimeout(resolve, 500))
@@ -120,6 +125,16 @@ function Home() {
               >
                 Explorar Categorias
               </Link>
+
+              {/* Botão renderizado apenas para Vendedores */}
+              {hasRole('SELLER') && (
+                  <button
+                      onClick={() => setIsAddModalOpen(true)}
+                      className="rounded-full bg-green-600 px-8 py-4 text-sm font-bold text-white shadow-lg shadow-green-900/30 hover:bg-green-500 hover:scale-105 transition-all duration-300 cursor-pointer"
+                  >
+                    + Anunciar Produto
+                  </button>
+              )}
             </div>
           </div>
         </div>
@@ -182,7 +197,6 @@ function Home() {
                       key={pId}
                       className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 transition-all duration-300 flex flex-col overflow-hidden"
                   >
-                    {/* Image Container - Link para detalhes */}
                     <Link to={`/product/${pId}`} className="relative h-72 overflow-hidden bg-gray-100 block cursor-pointer">
                       <img
                           src={displayImage}
@@ -193,25 +207,20 @@ function Home() {
                           }}
                       />
 
-                      {/* Category Badge */}
                       <span className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
                         {categoryName}
                       </span>
 
-                      {/* Badges de Estoque */}
                       {product.stockQuantity < 5 && (
                           <span className="absolute top-4 right-4 bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md animate-pulse">
                             Últimos
                           </span>
                       )}
 
-                      {/* Hover Overlay */}
                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </Link>
 
-                    {/* Content */}
                     <div className="p-6 flex flex-col flex-grow relative">
-                      {/* Título - Link para detalhes */}
                       <Link to={`/product/${pId}`} className="block">
                         <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-1 group-hover:text-red-600 transition-colors">
                           {product.productName}
@@ -230,7 +239,6 @@ function Home() {
                           </span>
                         </div>
 
-                        {/* Botão de Adicionar ao Carrinho */}
                         <button
                             onClick={(e) => handleAddToCart(e, product)}
                             disabled={isAdding || product.stockQuantity === 0}
@@ -287,6 +295,18 @@ function Home() {
             </p>
           </div>
         </div>
+
+        {/* Modal de Adicionar Produto */}
+        {isAddModalOpen && (
+            <AddProduct
+                onClose={() => setIsAddModalOpen(false)}
+                onProductAdded={() => {
+                  loadFeaturedProducts(); // Atualiza a vitrine automaticamente ao adicionar
+                  setIsAddModalOpen(false);
+                }}
+            />
+        )}
+
       </div>
   );
 }

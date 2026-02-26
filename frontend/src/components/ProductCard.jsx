@@ -1,8 +1,9 @@
-import { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 
 function ProductCard({ product }) {
+  const meuRef = useRef(null);
   const [adding, setAdding] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
@@ -10,7 +11,6 @@ function ProductCard({ product }) {
   const { addToCart } = useCart();
   const intervalRef = useRef(null);
 
-  // Parse images - suporta string separada por vírgula ou array
   const images = (() => {
     if (Array.isArray(product.imageUrl)) {
       return product.imageUrl;
@@ -21,18 +21,17 @@ function ProductCard({ product }) {
     return [product.imageUrl || product.image || 'https://via.placeholder.com/300x300?text=Produto'];
   })();
 
-  // Carrossel automático no hover com transição mais suave
   useEffect(() => {
     if (isHovering && images.length > 1) {
       intervalRef.current = setInterval(() => {
         setImageLoaded(false); // Trigger fade effect
         setCurrentImageIndex((prev) => (prev + 1) % images.length);
-      }, 2000); // Muda de imagem a cada 2 segundos para mais naturalidade
+      }, 2000);
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      // Volta para primeira imagem suavemente quando sai do hover
+
       if (!isHovering && currentImageIndex !== 0) {
         setImageLoaded(false);
         setTimeout(() => setCurrentImageIndex(0), 150);
@@ -47,7 +46,7 @@ function ProductCard({ product }) {
   }, [isHovering, images.length, currentImageIndex]);
 
   const handleAddToCart = async (event) => {
-    // Impede que o clique no botão abra a página do produto (navegação do Link pai)
+
     event.preventDefault();
     event.stopPropagation();
 
@@ -56,7 +55,6 @@ function ProductCard({ product }) {
 
     const timeout = new Promise(resolve => setTimeout(resolve, 500));
 
-    // Compatibilidade de ID (pode vir como productId ou product_ID)
     const pId = product.productId || product.product_ID;
 
     const [success] = await Promise.all([
@@ -72,7 +70,6 @@ function ProductCard({ product }) {
     }
   };
 
-  // Garante o ID correto
   const productId = product.productId || product.product_ID;
 
   return (

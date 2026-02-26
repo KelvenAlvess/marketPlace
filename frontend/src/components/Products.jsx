@@ -14,7 +14,7 @@ function Products() {
     category: '',
     minPrice: '',
     maxPrice: '',
-    sortBy: 'name' // name, price-asc, price-desc
+    sortBy: 'name'
   });
 
   useEffect(() => {
@@ -46,22 +46,18 @@ function Products() {
   const applyFilters = () => {
     let filtered = [...products];
 
-    // Filtro por categoria
     if (filters.category) {
       filtered = filtered.filter(p => p.category?.category_ID === parseInt(filters.category));
     }
 
-    // Filtro por preço mínimo
     if (filters.minPrice) {
       filtered = filtered.filter(p => p.price >= parseFloat(filters.minPrice));
     }
 
-    // Filtro por preço máximo
     if (filters.maxPrice) {
       filtered = filtered.filter(p => p.price <= parseFloat(filters.maxPrice));
     }
 
-    // Ordenação
     if (filters.sortBy === 'name') {
       filtered.sort((a, b) => a.productName.localeCompare(b.productName));
     } else if (filters.sortBy === 'price-asc') {
