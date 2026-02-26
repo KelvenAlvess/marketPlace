@@ -67,7 +67,17 @@ public class DataInitializer implements CommandLineRunner {
             buyer.setRoles(Set.of(UserRole.BUYER));
             buyer.setCreatedAt(LocalDateTime.now());
 
-            userRepository.saveAll(Arrays.asList(admin, buyer));
+            User seller = new User();
+            seller.setUsername("Vendedor Teste");
+            seller.setEmail("vendedor@marketplace.com");
+            seller.setPassword(passwordEncoder.encode("senha123"));
+            seller.setCpf("22222222222");
+            seller.setPhoneNumber("11977777777");
+            seller.setAddress("Avenida Comercial, 456 - Recife/PE");
+            seller.setRoles(Set.of(UserRole.SELLER, UserRole.BUYER));
+            seller.setCreatedAt(LocalDateTime.now());
+
+            userRepository.saveAll(Arrays.asList(admin, buyer, seller));
             log.info("Usuários criados!");
 
             Category catEletronicos = new Category();
