@@ -32,6 +32,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
+        // Log da requisição (CORRIGIDO: request.getMethod())
+        log.info("🔍 Requisição: {} {} - Auth Header: {}", request.getMethod(), path, request.getHeader("Authorization") != null ? "Presente" : "Ausente");
+
         // Swagger e documentação
         if (path.startsWith("/swagger-ui") ||
                 path.startsWith("/v3/api-docs") ||
@@ -61,8 +64,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         String username = null;
         String jwtToken = null;
 
-        log.info("🔍 Requisição: {} {} - Auth Header: {}", method, path, requestTokenHeader != null ? "Presente" : "Ausente");
-
         if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
             jwtToken = requestTokenHeader.substring(7);
             try {
@@ -76,12 +77,12 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 log.error("Erro ao processar token JWT", e);
             }
         } else {
-            log.warn("⚠️ Nenhum token Bearer encontrado no header Authorization");
+            // Apenas loga aviso se não for rota pública
+            log.debug("⚠️ Nenhum token Bearer encontrado no header Authorization");
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
-
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
                 if (jwtTokenUtil.validateToken(jwtToken, userDetails.getUsername())) {
@@ -92,7 +93,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 }
             } catch (UsernameNotFoundException e) {
                 log.warn("Usuário do token não encontrado no banco de dados (Token órfão): {}", username);
-
             }
         }
         chain.doFilter(request, response);

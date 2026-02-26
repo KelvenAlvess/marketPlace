@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { initMercadoPago, CardPayment } from '@mercadopago/sdk-react';
 import paymentService from '../service/paymentService';
 import userService from '../service/userService';
-import orderService from '../service/orderService.js';
+import orderService from '../service/OrderService.js';
 import api from '../service/api';
 import { useAuth } from '../context/AuthContext';
 import { v4 as uuidv4 } from 'uuid';

@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import ProductDetails from './pages/ProductDetails';
+import { useState } from 'react';
 
 import Navbar from './components/Navbar';
 import Home from './components/Home';

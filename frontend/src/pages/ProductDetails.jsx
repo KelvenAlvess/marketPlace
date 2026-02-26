@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import productService from '../service/productService';
-import orderService from '../service/orderService';
+import orderService from '../service/OrderService.js';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
