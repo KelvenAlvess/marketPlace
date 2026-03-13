@@ -2,7 +2,9 @@ package com.example.marketPlace.service;
 
 import com.example.marketPlace.dto.ProductCreateDTO;
 import com.example.marketPlace.dto.ProductResponseDTO;
+import com.example.marketPlace.exception.CategoryNotFoundException;
 import com.example.marketPlace.exception.ProductNotFoundException;
+import com.example.marketPlace.exception.UserNotFoundException;
 import com.example.marketPlace.model.Category;
 import com.example.marketPlace.model.Product;
 import com.example.marketPlace.model.User;
@@ -31,10 +33,10 @@ public class ProductService {
         log.info("Criando produto: {}", dto.productName());
 
         Category category = categoryRepository.findById(dto.categoryId())
-                .orElseThrow(() -> new RuntimeException("Categoria não encontrada com ID: " + dto.categoryId()));
+                .orElseThrow(() -> new CategoryNotFoundException("Categoria não encontrada com ID: " + dto.categoryId()));
 
         User seller = userRepository.findById(dto.sellerId())
-                .orElseThrow(() -> new RuntimeException("Vendedor não encontrado com ID: " + dto.sellerId()));
+                .orElseThrow(() -> new UserNotFoundException("Vendedor não encontrado com ID: " + dto.sellerId()));
 
         Product product = dto.toEntity(category, seller);
         Product savedProduct = productRepository.save(product);
@@ -70,7 +72,7 @@ public class ProductService {
         log.info("Buscando produtos da categoria: {}", categoryId);
 
         Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new RuntimeException("Categoria não encontrada com ID: " + categoryId));
+                .orElseThrow(() -> new CategoryNotFoundException("Categoria não encontrada com ID: " + categoryId));
 
         return productRepository.findByCategory(category).stream()
                 .map(ProductResponseDTO::from)
@@ -82,7 +84,7 @@ public class ProductService {
         log.info("Buscando produtos do vendedor: {}", sellerId);
 
         User seller = userRepository.findById(sellerId)
-                .orElseThrow(() -> new RuntimeException("Vendedor não encontrado com ID: " + sellerId));
+                .orElseThrow(() -> new UserNotFoundException("Vendedor não encontrado com ID: " + sellerId));
 
         return productRepository.findBySeller(seller).stream()
                 .map(ProductResponseDTO::from)
@@ -97,10 +99,10 @@ public class ProductService {
                 .orElseThrow(() -> new ProductNotFoundException("Produto não encontrado com ID: " + id));
 
         Category category = categoryRepository.findById(dto.categoryId())
-                .orElseThrow(() -> new RuntimeException("Categoria não encontrada com ID: " + dto.categoryId()));
+                .orElseThrow(() -> new CategoryNotFoundException("Categoria não encontrada com ID: " + dto.categoryId()));
 
         User seller = userRepository.findById(dto.sellerId())
-                .orElseThrow(() -> new RuntimeException("Vendedor não encontrado com ID: " + dto.sellerId()));
+                .orElseThrow(() -> new UserNotFoundException("Vendedor não encontrado com ID: " + dto.sellerId()));
 
         product.setProductName(dto.productName());
         product.setDescription(dto.description());

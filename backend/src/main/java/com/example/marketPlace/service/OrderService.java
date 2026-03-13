@@ -239,7 +239,7 @@ public class OrderService {
     @Transactional
     public OrderResponseDTO updateShippingCost(Long orderId, BigDecimal shippingCost) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+                .orElseThrow(() -> new OrderNotFoundException("Pedido não encontrado"));
 
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new RuntimeException("Não é possível alterar frete de pedido finalizado");
@@ -259,13 +259,13 @@ public class OrderService {
     @Transactional
     public void decrementStock(Long orderId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+                .orElseThrow(() -> new OrderNotFoundException("Pedido não encontrado"));
 
         for (OrderItem item : order.getItems()) {
             Product product = item.getProduct();
             int newQty = product.getStockQuantity() - item.getQuantity();
             if (newQty < 0) {
-                throw new RuntimeException("Estoque insuficiente para: " + product.getProductName());
+                throw new InsufficientStockException("Estoque insuficiente para: " + product.getProductName());
             }
             product.setStockQuantity(newQty);
             productRepository.save(product);
@@ -293,7 +293,7 @@ public class OrderService {
     @Transactional
     public void approveOrder(Long orderId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+                .orElseThrow(() -> new OrderNotFoundException("Pedido não encontrado"));
 
         if (order.getStatus() == OrderStatus.PAID) {
             return;

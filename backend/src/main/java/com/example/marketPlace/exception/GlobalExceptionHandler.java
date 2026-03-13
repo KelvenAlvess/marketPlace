@@ -77,6 +77,13 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "Credenciais inválidas", request);
     }
 
+    @ExceptionHandler(CartIemNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCartItemNotFoundException(
+            CartIemNotFoundException ex, WebRequest request) {
+        log.error("CartIemNotFoundException: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(PaymentException.class)
     public ResponseEntity<Object> handlePaymentException(PaymentException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(

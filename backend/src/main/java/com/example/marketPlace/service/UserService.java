@@ -73,7 +73,6 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-    // --- CORREÇÃO: Método aceita UserUpdateDTO ---
     @Transactional
     public UserResponseDTO updateUser(Long id, UserUpdateDTO dto) {
         log.info("Atualizando usuário. ID: {}", id);
@@ -108,7 +107,6 @@ public class UserService {
 
         return UserResponseDTO.from(updatedUser);
     }
-    // ---------------------------------------------
 
     @Transactional
     public void deleteUser(Long id) {

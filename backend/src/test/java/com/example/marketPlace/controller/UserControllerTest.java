@@ -3,18 +3,20 @@ package com.example.marketPlace.controller;
 import com.example.marketPlace.configurations.JwtTokenUtil;
 import com.example.marketPlace.dto.UserCreateDTO;
 import com.example.marketPlace.dto.UserResponseDTO;
-import com.example.marketPlace.dto.UserUpdateDTO; // Importante!
+import com.example.marketPlace.dto.UserUpdateDTO;
 import com.example.marketPlace.model.enums.UserRole;
 import com.example.marketPlace.service.CustomUserDetailsService;
 import com.example.marketPlace.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -28,31 +30,35 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(UserController.class)
-@AutoConfigureMockMvc(addFilters = false) // Desabilita segurança para facilitar teste unitário do controller
+@SpringBootTest
+@AutoConfigureMockMvc(addFilters = false) // Essa linha é quem cria o MockMvc!
+@ActiveProfiles("test")
 class UserControllerTest {
+
+    private static final String BASE_URL = "/api/users";
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
-    private UserService userService;
-
-    @MockBean
-    private JwtTokenUtil jwtTokenUtil;
-
-    @MockBean
-    private CustomUserDetailsService customUserDetailsService;
-
     @Autowired
     private ObjectMapper objectMapper;
 
-    private UserResponseDTO userResponseDTO;
-    private UserCreateDTO userCreateDTO;
+    @MockitoBean
+    private UserService userService;
+
+    @MockitoBean
+    private JwtTokenUtil jwtTokenUtil;
+
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
+
+    private UserResponseDTO defaultUserResponse;
+
+    private UserCreateDTO defaultUserCreate;
 
     @BeforeEach
     void setUp() {
-        userResponseDTO = new UserResponseDTO(
+        defaultUserResponse = new UserResponseDTO(
                 1L,
                 "Test User",
                 "test@example.com",
@@ -63,7 +69,7 @@ class UserControllerTest {
                 LocalDateTime.now()
         );
 
-        userCreateDTO = new UserCreateDTO(
+        defaultUserCreate = new UserCreateDTO(
                 "Test User",
                 "test@example.com",
                 "12345678901",
@@ -75,49 +81,53 @@ class UserControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/users - Deve criar um usuário e retornar 201 Created")
     void createUser_ShouldReturnCreatedUser() throws Exception {
-        when(userService.createUser(any(UserCreateDTO.class))).thenReturn(userResponseDTO);
+        when(userService.createUser(any(UserCreateDTO.class))).thenReturn(defaultUserResponse);
 
-        mockMvc.perform(post("/api/users")
+        mockMvc.perform(post(BASE_URL)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(userCreateDTO)))
+                        .content(objectMapper.writeValueAsString(defaultUserCreate)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.user_ID").value(1L))
                 .andExpect(jsonPath("$.email").value("test@example.com"));
     }
 
     @Test
+    @DisplayName("GET /api/users - Deve retornar lista de usuários e status 200 OK")
     void getAllUsers_ShouldReturnList() throws Exception {
-        when(userService.getAllUsers()).thenReturn(List.of(userResponseDTO));
+        when(userService.getAllUsers()).thenReturn(List.of(defaultUserResponse));
 
-        mockMvc.perform(get("/api/users"))
+        mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].user_ID").value(1L));
+                .andExpect(jsonPath("$[0].user_ID").value(1L))
+                .andExpect(jsonPath("$[0].userName").value("Test User"));
     }
 
     @Test
+    @DisplayName("GET /api/users/{id} - Deve retornar um usuário específico e status 200 OK")
     void getUserById_ShouldReturnUser() throws Exception {
-        when(userService.getUserById(1L)).thenReturn(userResponseDTO);
+        when(userService.getUserById(1L)).thenReturn(defaultUserResponse);
 
-        mockMvc.perform(get("/api/users/1"))
+        mockMvc.perform(get(BASE_URL + "/{id}", 1L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user_ID").value(1L));
     }
 
     @Test
+    @DisplayName("PUT /api/users/{id} - Deve atualizar um usuário e retornar status 200 OK")
     void updateUser_ShouldReturnUpdatedUser() throws Exception {
-        // CORREÇÃO: Usamos UserUpdateDTO aqui, pois o Controller agora exige isso
-        UserUpdateDTO updateDTO = new UserUpdateDTO(
+        var updateDTO = new UserUpdateDTO(
                 "Updated Name",
                 "test@example.com",
                 "12345678901",
                 "11999999999",
-                null, // Senha nula é permitida no update
+                null,
                 "Updated Address",
                 Set.of(UserRole.BUYER)
         );
 
-        UserResponseDTO updatedResponse = new UserResponseDTO(
+        var updatedResponse = new UserResponseDTO(
                 1L,
                 "Updated Name",
                 "test@example.com",
@@ -128,10 +138,9 @@ class UserControllerTest {
                 LocalDateTime.now()
         );
 
-        // Ajustamos o Mock para esperar UserUpdateDTO
         when(userService.updateUser(eq(1L), any(UserUpdateDTO.class))).thenReturn(updatedResponse);
 
-        mockMvc.perform(put("/api/users/1")
+        mockMvc.perform(put(BASE_URL + "/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
                 .andExpect(status().isOk())
@@ -139,10 +148,11 @@ class UserControllerTest {
     }
 
     @Test
+    @DisplayName("DELETE /api/users/{id} - Deve deletar um usuário e retornar 204 No Content")
     void deleteUser_ShouldReturnNoContent() throws Exception {
         doNothing().when(userService).deleteUser(1L);
 
-        mockMvc.perform(delete("/api/users/1"))
+        mockMvc.perform(delete(BASE_URL + "/{id}", 1L))
                 .andExpect(status().isNoContent());
     }
 }

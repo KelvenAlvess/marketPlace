@@ -2,6 +2,9 @@ package com.example.marketPlace.service;
 
 import com.example.marketPlace.dto.CartItemCreateDTO;
 import com.example.marketPlace.dto.CartItemResponseDTO;
+import com.example.marketPlace.exception.CartIemNotFoundException;
+import com.example.marketPlace.exception.ProductNotFoundException;
+import com.example.marketPlace.exception.UserNotFoundException;
 import com.example.marketPlace.model.CartItem;
 import com.example.marketPlace.model.Product;
 import com.example.marketPlace.model.User;
@@ -29,10 +32,10 @@ public class CartItemService {
         log.info("Adicionando item ao carrinho: {}", dto.productId());
 
         User user = userRepository.findById(dto.userId())
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + dto.userId()));
+                .orElseThrow(() -> new UserNotFoundException("Usuário não encontrado com ID: " + dto.userId()));
 
         Product product = productRepository.findById(dto.productId())
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
+                .orElseThrow(() -> new ProductNotFoundException("Produto não encontrado"));
 
         CartItem cartItem = new CartItem();
         cartItem.setUser(user);
@@ -63,7 +66,7 @@ public class CartItemService {
     public CartItemResponseDTO updateCartItemQuantity(Long cartItemId, Integer quantity){
         log.info("Atualizando quantidade do item do carrinho: {}", cartItemId);
         CartItem cartItem = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Item do carrinho não encontrado com ID: " + cartItemId));
+                .orElseThrow(() -> new CartIemNotFoundException("Item do carrinho não encontrado com ID: " + cartItemId));
         cartItem.setQuantity(quantity);
         CartItem updatedCartItem = cartItemRepository.save(cartItem);
         return CartItemResponseDTO.from(updatedCartItem);
