@@ -49,7 +49,6 @@ jobs:
         run: npm install --global vercel@latest
 
       - name: Deploy no Vercel (Build Remoto)
-        working-directory: ./frontend
 
         run: vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
         env:
