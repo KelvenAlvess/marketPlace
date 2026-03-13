@@ -1,0 +1,18 @@
+name: Keep Backend Alive
+
+on:
+  schedule:
+
+    - cron: "*/14 * * * *"
+
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Render API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar requisição para acordar a API
+
+        run: |
+          curl -sSf https://marketplace-pinc.onrender.com/api/products > /dev/null || echo "Ping enviado. A API pode estar acordando."
